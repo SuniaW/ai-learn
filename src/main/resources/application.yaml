@@ -1,3 +1,11 @@
 spring:
   application:
     name: ai-learn
+  ai:
+    openai:
+      api-key: sk-41ff1d3510d540179bd99fde2160502c
+      base-url: https://api.deepseek.com  # 👈 关键！必须添加
+      chat:
+        options:
+          model: deepseek-chat
+          temperature: 0.7
