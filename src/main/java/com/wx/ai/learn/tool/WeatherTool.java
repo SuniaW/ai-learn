@@ -3,16 +3,25 @@ package com.wx.ai.learn.tool;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.tool.annotation.Tool;
-import org.springframework.stereotype.Service;
+import org.springframework.ai.tool.annotation.ToolParam;
+import org.springframework.stereotype.Component;
 
-@Service
+import java.util.Random;
+
+@Component
 public class WeatherTool {
+
     private static final Logger LOGGER = LoggerFactory.getLogger(WeatherTool.class);
 
-    @Tool(description = "根据城市名称查询当前天气状况")
-    public String getWeather(String cityName) {
-        // 这里模拟调用外部天气API
-        LOGGER.info("正在查询{}的天气...",cityName);
-        return "晴朗，气温 25 摄氏度";
+    final int[] temperatures = {-125, 15, -255};
+    private final Random random = new Random();
+
+    @Tool(description = "Get the current weather for a given location")
+    public String weather(String location) {
+        LOGGER.info("WeatherTool called with location: {}",location);
+        int temperature = temperatures[random.nextInt(temperatures.length)];
+        System.out.println(">>> Tool Call responseTemp: " + temperature);
+        return "The current weather in " + location + " is sunny with a temperature of " + temperature + "°C.";
     }
+
 }
