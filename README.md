@@ -7,13 +7,20 @@
 ✨ 核心特性
 
 ✅ 基于 Spring Boot 4.0 + Java 21（启用虚拟线程）
+
 ✅ 使用 Spring AI 2.0.0-M2 最新 Milestone 版本
+
 ✅ 接入 DeepSeek（通过 OpenAI 兼容 API 代理）
+
 ✅ 工具调用：@Tool 注解自动注册天气查询工具
+
 ✅ Advisor 增强：
+
 SelfRefineEvaluationAdvisor：LLM 自我评估与重试
 MyLoggingAdvisor：自定义请求/响应日志
+
 ✅ 支持多客户端配置（通用助手 vs 气象专家）
+
 ✅ 流式响应接口（SSE）
 
 🛠️ 技术栈
@@ -59,16 +66,27 @@ curl "http://localhost:8080/ai/generateStream?message=讲个笑话"
 📂 项目结构
 
 src/
+
 ├── main/
+
 │   ├── java/
+
 │   │   └── com.wx.ai.learn/
+
 │   │       ├── config/      # AI 客户端与 Advisor 配置
+
 │   │       ├── tool/        # @Tool 工具类（如 WeatherTool）
+
 │   │       ├── advisor/     # 自定义 Advisor（日志、评估等）
+
 │   │       ├── service/     # 业务服务层
+
 │   │       └── controller/  # REST 接口
+
 │   └── resources/
+
 │       └── application.yml  # 模型与 API 配置
+
 └── pom.xml                  # Maven 依赖
 
 ⚙️ 配置说明 (application.yml)
