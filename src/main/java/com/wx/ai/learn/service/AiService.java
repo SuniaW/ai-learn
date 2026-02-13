@@ -1,3 +1,9 @@
+/*
+ * Copyright (c) 2026 the original author or authors. All rights reserved.
+ *
+ * @author wangxu
+ * @since 2026
+ */
 package com.wx.ai.learn.service;
 
 import org.springframework.ai.chat.client.ChatClient;

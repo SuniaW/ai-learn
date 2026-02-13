@@ -1,3 +1,9 @@
+/*
+ * Copyright (c) 2026 the original author or authors. All rights reserved.
+ *
+ * @author wangxu
+ * @since 2026
+ */
 package com.wx.ai.learn.service;
 
 import org.slf4j.Logger;
@@ -21,7 +27,9 @@ public class WeatherService {
     }
 
     public String doWork(String city) {
+        //没有使用Function
         String common = genericClient.prompt("你好").call().content();
+        //使用Function
         String weather = this.weatherClient
                 .prompt("请查询 " + city + " 的天气，并友好地回复用户。")
                 .call()
