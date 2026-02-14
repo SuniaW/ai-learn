@@ -1,0 +1,11 @@
+spring:
+  application:
+    name: spring-ai-learn
+  ai:
+    openai:
+      api-key: ${OPENAI_API_KEY}  # 👈 从环境变量 OPENAI_API_KEY 读取
+      base-url: https://api.deepseek.com  # 👈 关键！必须添加
+      chat:
+        options:
+          model: deepseek-chat
+          temperature: 0.7
