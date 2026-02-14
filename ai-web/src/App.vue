@@ -1,11 +1,10 @@
-<script setup lang="ts"></script>
-
 <template>
-  <h1>You did it!</h1>
-  <p>
-    Visit <a href="https://vuejs.org/" target="_blank" rel="noopener">vuejs.org</a> to read the
-    documentation
-  </p>
+  <div>
+    <h1>AI 应用开发示例：Spring AI 2.x + DeepSeek + 工具调用 + Advisor 增强 + Vue（TypeScript）</h1>
+    <SearchBox />
+  </div>
 </template>
 
-<style scoped></style>
+<script setup lang="ts">
+import SearchBox from './components/ChatBox.vue'
+</script>
