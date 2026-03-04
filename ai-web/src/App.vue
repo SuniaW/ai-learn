@@ -6,5 +6,5 @@
 </template>
 
 <script setup lang="ts">
-import SearchBox from './components/ChatBox.vue'
+import SearchBox from './components/RagChatBox.vue'
 </script>

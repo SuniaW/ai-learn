@@ -18,6 +18,13 @@ export default defineConfig({
         // 如果后端 context path 不是根路径，可加 rewrite（此处不需要）
         // rewrite: (path) => path.replace(/^\/ai/, '/ai')
       },
+      // 所有以 /ai 开头的请求都代理到 Spring Boot 后端
+      '/api': {
+        target: 'http://localhost:8081',
+        changeOrigin: true,
+        // 如果后端 context path 不是根路径，可加 rewrite（此处不需要）
+        // rewrite: (path) => path.replace(/^\/ai/, '/ai')
+      },
     },
   },
   resolve: {

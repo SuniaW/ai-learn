@@ -3,9 +3,9 @@ spring:
     name: policy-rag-system
   ai:
     ollama:
-      base-url: http://localhost:11434
+      base-url: http://8.140.221.150:11434
       chat:
-        model: qwen:7b
+        model: qwen2.5:1.5b
         options:
           temperature: 0.3 # 政策问答需要严谨，降低温度
       embedding:
@@ -13,7 +13,7 @@ spring:
     vectorstore:
       milvus:
         client:
-          host: localhost
+          host: 8.140.221.150
           port: 19530
         collection-name: policy_docs
         embedding-dimension: 1024 # 需与 Embedding 模型维度一致
