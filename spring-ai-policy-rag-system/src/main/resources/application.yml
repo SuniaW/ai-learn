@@ -1,0 +1,21 @@
+spring:
+  application:
+    name: policy-rag-system
+  ai:
+    ollama:
+      base-url: http://localhost:11434
+      chat:
+        model: qwen:7b
+        options:
+          temperature: 0.3 # 政策问答需要严谨，降低温度
+      embedding:
+        model: bge-m3 # 确保 Ollama 中有此模型
+    vectorstore:
+      milvus:
+        client:
+          host: localhost
+          port: 19530
+        collection-name: policy_docs
+        embedding-dimension: 1024 # 需与 Embedding 模型维度一致
+server:
+  port: 8081
