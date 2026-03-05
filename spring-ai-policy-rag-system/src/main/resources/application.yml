@@ -19,3 +19,20 @@ spring:
         embedding-dimension: 1024 # 需与 Embedding 模型维度一致
 server:
   port: 8081
+
+
+logging:
+  file:
+    name: logs/rag-system.log # 日志将保存在项目根目录下的 logs 文件夹中
+  level:
+    # 1. 开启你自己项目包的 Debug 日志
+    com.ailearn.governmentaffairsrag: DEBUG
+
+    # 2. 开启 Spring AI 的 Debug 日志 (非常重要！可以看到发送给大模型的真实 Prompt)
+    org.springframework.ai: DEBUG
+
+    # 3. 开启 Milvus 向量数据库交互的 Debug 日志
+    io.milvus: DEBUG
+
+    # 4. 如果需要看 Web 请求的底层细节，可以开启这个
+    org.springframework.web: DEBUG
