@@ -54,7 +54,7 @@
     </appender>
 
     <!-- 配置你的包的 DEBUG 级别 -->
-    <logger name="com.ailearn.governmentaffairsrag" level="DEBUG" />
+    <logger name="com.wx.policyragsystem" level="DEBUG" />
     <logger name="org.springframework.ai" level="DEBUG" />
     <logger name="io.milvus" level="DEBUG" />
 

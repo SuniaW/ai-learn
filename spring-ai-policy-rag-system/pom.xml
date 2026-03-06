@@ -11,7 +11,7 @@
         <relativePath/>
     </parent>
 
-    <groupId>com.ailearn.governmentaffairsrag</groupId>
+    <groupId>com.wx.policyragsystem</groupId>
     <artifactId>spring-ai-policy-rag-system</artifactId>
     <version>1.0-SNAPSHOT</version>
     <name>policy-rag-system</name>

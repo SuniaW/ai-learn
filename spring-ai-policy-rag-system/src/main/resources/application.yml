@@ -3,36 +3,44 @@ spring:
     name: policy-rag-system
   ai:
     ollama:
+      # 远程 Ollama 地址
       base-url: http://8.140.221.150:11434
       chat:
         model: qwen2.5:1.5b
         options:
-          temperature: 0.3 # 政策问答需要严谨，降低温度
+          temperature: 0.3      # 严谨模式，适合政策解读
+          top-p: 0.9           # 保持回答的连贯性
+          # num-predict: 512   # 限制输出长度，节省内存/响应时间
       embedding:
-        model: bge-m3 # 确保 Ollama 中有此模型
+        model: bge-m3          # 维度必须是 1024
     vectorstore:
       milvus:
         client:
           host: 8.140.221.150
           port: 19530
+        # 即使你在 Java 代码里写死了，这里保留配置也是好习惯
         collection-name: policy_docs
-        embedding-dimension: 1024 # 需与 Embedding 模型维度一致
+        embedding-dimension: 1024
+        # database-name: default
+
 server:
   port: 8081
-
+  # 增加 Servlet 超时时间，防止大模型生成太慢导致连接断开
+  tomcat:
+    connection-timeout: 60s
 
 logging:
   file:
-    name: logs/rag-system.log # 日志将保存在项目根目录下的 logs 文件夹中
+    name: logs/rag-system.log
   level:
-    # 1. 开启你自己项目包的 Debug 日志
-    com.ailearn.governmentaffairsrag: DEBUG
-
-    # 2. 开启 Spring AI 的 Debug 日志 (非常重要！可以看到发送给大模型的真实 Prompt)
+    # 1. 业务逻辑日志
+    com.wx.policyragsystem: DEBUG
+    # 2. Spring AI 核心日志（监控 Prompt 拼接）
     org.springframework.ai: DEBUG
-
-    # 3. 开启 Milvus 向量数据库交互的 Debug 日志
+    # 3. Milvus 交互日志（监控集合创建和检索过程）
     io.milvus: DEBUG
-
-    # 4. 如果需要看 Web 请求的底层细节，可以开启这个
-    org.springframework.web: DEBUG
+    # 4. 远程调用日志
+    org.springframework.web.client.RestTemplate: DEBUG
+    # 彻底关闭一些无关紧要的框架警告，保持控制台整洁
+    org.apache.catalina: INFO
+    org.apache.tomcat: INFO
