@@ -30,7 +30,7 @@ public class RagService {
             SearchRequest.builder()
                 .query(query)
                 .topK(3)
-                .similarityThreshold(0.1) // 阈值可根据需要调整
+                .similarityThreshold(0.6) // 阈值可根据需要调整
                 .build()
         );
 
