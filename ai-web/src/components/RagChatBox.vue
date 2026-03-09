@@ -1,100 +1,127 @@
 <template>
-  <div class="chat-wrapper">
-    <!-- 1. 顶部导航与文档上传 -->
-    <header class="glass-header">
-      <div class="header-content">
-        <div class="logo">
-          <span class="icon">📚</span>
-          <h1>政策文档智库</h1>
-        </div>
-
-        <div class="upload-section">
-          <div class="file-input-wrapper">
-            <input type="file" id="file" @change="handleFileChange" class="hidden-input" />
-            <label for="file" class="file-label">
-              {{ selectedFile ? selectedFile.name : '选择政策文件...' }}
-            </label>
-          </div>
-          <button @click="uploadFile" :disabled="!selectedFile || isUploading" class="btn-upload">
-            {{ isUploading ? '解析中...' : '上传入库' }}
-          </button>
-        </div>
+  <div class="page-container">
+    <!-- 1. 顶部：Element Plus 风格 Header -->
+    <div class="chat-header">
+      <div class="header-info">
+        <span class="header-icon">📚</span>
+        <h2>政策文档智库</h2>
       </div>
-      <div
-        v-if="uploadStatus"
-        class="status-bar"
-        :class="{ 'status-success': !uploadStatus.includes('失败') }"
-      >
-        {{ uploadStatus }}
-      </div>
-    </header>
 
-    <!-- 2. 聊天区域 -->
-    <main class="chat-main" ref="chatContainer">
-      <div class="chat-wrapper">
-        <!-- 初始欢迎状态 -->
-        <div v-if="messages.length === 0" class="welcome-card">
-          <div class="bot-avatar-large">🤖</div>
-          <h2>您好！我是您的政策助手</h2>
-          <p>您可以上传政策文档，我会基于文档为您提供精准的咨询服务。</p>
-          <div class="hints">
-            <span>💡 咨询买房补贴</span>
-            <span>💡 了解人才落户政策</span>
-            <span>💡 创业扶持资金申请</span>
-          </div>
-        </div>
+      <div class="upload-actions">
+        <el-upload
+          action="#"
+          :auto-upload="false"
+          :on-change="handleFileChange"
+          :show-file-list="false"
+        >
+          <template #trigger>
+            <el-button plain :icon="Link">
+              {{ selectedFile ? selectedFile.name : '选择政策文件' }}
+            </el-button>
+          </template>
+          <el-button
+            type="primary"
+            :disabled="!selectedFile"
+            :loading="isUploading"
+            @click="uploadFile"
+            style="margin-left: 10px"
+          >
+            上传入库
+          </el-button>
+        </el-upload>
+      </div>
+    </div>
+
+    <!-- 2. 中间：消息显示区 (唯一滚动区域) -->
+    <div class="message-container" ref="chatContainer">
+      <div class="message-list-inner">
+        <!-- 欢迎卡片 -->
+        <el-empty v-if="messages.length === 0" description=" ">
+          <template #default>
+            <div class="welcome-box">
+              <div class="bot-icon">🤖</div>
+              <h3>您好！我是您的政策助手</h3>
+              <p>您可以上传政策文档，我会基于文档为您提供精准的咨询服务。</p>
+              <div class="hint-tags">
+                <el-tag
+                  v-for="tag in hints"
+                  :key="tag"
+                  @click="queryInput = tag"
+                  class="clickable-tag"
+                >
+                  {{ tag }}
+                </el-tag>
+              </div>
+            </div>
+          </template>
+        </el-empty>
 
         <!-- 消息列表 -->
-        <div v-for="(msg, index) in messages" :key="index" :class="['message-row', msg.role]">
-          <div class="avatar">{{ msg.role === 'user' ? '👤' : '🤖' }}</div>
-          <div class="bubble">
-            <div class="role-header">
-              <span class="role-name">{{ msg.role === 'user' ? '我的提问' : '政策智库助手' }}</span>
-              <!-- 只有助手且有计时时显示 -->
-              <span v-if="msg.role === 'assistant' && msg.duration" class="thinking-tag">
-                ⏱️ 思考 {{ msg.duration.toFixed(1) }}s
-              </span>
+        <div v-for="(msg, index) in messages" :key="index" :class="['msg-row', msg.role]">
+          <el-avatar :size="36" :src="msg.role === 'user' ? userAvatar : botAvatar" />
+          <div class="msg-content">
+            <div class="msg-meta">
+              <span class="role-label">{{
+                msg.role === 'user' ? '我的提问' : '政策智库助手'
+              }}</span>
+              <span v-if="msg.duration" class="time-label">⏱️ {{ msg.duration.toFixed(1) }}s</span>
             </div>
-
-            <!-- Markdown 渲染内容 -->
-            <div
-              v-if="msg.role === 'assistant'"
-              class="markdown-body"
-              v-html="renderMarkdown(msg.content)"
-            ></div>
-            <div v-else class="text-content">{{ msg.content }}</div>
+            <el-card shadow="never" class="msg-bubble">
+              <div
+                v-if="msg.role === 'assistant'"
+                class="markdown-body"
+                v-html="renderMarkdown(msg.content)"
+              ></div>
+              <div v-else class="text-raw">{{ msg.content }}</div>
+            </el-card>
           </div>
         </div>
 
-        <!-- 思考中状态 -->
-        <div v-if="isLoading" class="loading-row">
-          <div class="typing-indicator"><span></span><span></span><span></span></div>
-          <p>AI 正在检索政策库并思考中... ({{ currentThinkingTime.toFixed(1) }}s)</p>
+        <!-- 思考中 -->
+        <div v-if="isLoading" class="msg-row assistant">
+          <el-avatar :size="36" :src="botAvatar" />
+          <div class="msg-content">
+            <div class="thinking-box">
+              <div class="dot-typing"></div>
+              <span>AI 正在思考... ({{ currentThinkingTime.toFixed(1) }}s)</span>
+            </div>
+          </div>
         </div>
       </div>
-    </main>
+    </div>
 
-    <!-- 3. 底部输入区 -->
-    <footer class="input-footer">
-      <div class="input-container">
-        <textarea
+    <!-- 3. 底部：固定输入区 -->
+    <div class="footer-input">
+      <div class="input-card">
+        <el-input
           v-model="queryInput"
-          @keydown.enter.prevent="sendQuery"
+          type="textarea"
+          :autosize="{ minRows: 1, maxRows: 4 }"
           placeholder="请输入您想查询的政策问题..."
-          rows="1"
-        ></textarea>
-        <button v-if="isLoading" @click="stopGeneration" class="btn-stop">停止</button>
-        <button v-else @click="sendQuery" :disabled="!queryInput.trim()" class="btn-send">
-          发送
-        </button>
+          @keydown.enter.prevent="sendQuery"
+        />
+        <div class="input-actions">
+          <el-button v-if="isLoading" type="danger" @click="stopGeneration" plain
+            >停止生成</el-button
+          >
+          <el-button v-else type="primary" :disabled="!queryInput.trim()" @click="sendQuery">
+            发送
+          </el-button>
+        </div>
       </div>
-    </footer>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, nextTick, onUnmounted } from 'vue'
+import { Link } from '@element-plus/icons-vue'
 import MarkdownIt from 'markdown-it'
+
+// ... (逻辑代码保持不变，仅修改了少量 UI 适配变量)
+const hints = ['咨询买房补贴', '了解人才落户政策', '创业扶持资金申请']
+const userAvatar = 'https://api.dicebear.com/7.x/avataaars/svg?seed=user'
+const botAvatar = 'https://api.dicebear.com/7.x/bottts/svg?seed=bot'
 
 // Markdown 配置
 const md = new MarkdownIt()
@@ -249,279 +276,157 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-/* 顶部样式 */
-.glass-header {
-  background: rgba(255, 255, 255, 0.9);
-  backdrop-filter: blur(10px);
-  border-bottom: 1px solid #e2e8f0;
-  padding: 12px 24px;
-  position: sticky;
-  top: 0;
-  z-index: 100;
+.el-empty{
+  max-height: 200px;
 }
-.header-content {
-  max-width: 1000px;
-  margin: 0 auto;
+/* 容器全屏化适配 */
+.page-container {
+  height: 100%; /* 继承 el-main 的高度 */
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* 顶部工具栏 */
+.chat-header {
+  background: #fff;
+  padding: 10px 24px;
   display: flex;
   justify-content: space-between;
   align-items: center;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
+  z-index: 10;
 }
-.logo {
+.header-info {
   display: flex;
   align-items: center;
-  gap: 10px;
-}
-.logo h1 {
-  font-size: 1.2rem;
-  font-weight: 700;
-  margin: 0;
-  background: linear-gradient(90deg, #2563eb, #7c3aed);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-}
-.upload-section {
-  display: flex;
-  gap: 10px;
-}
-
-/* 按钮与输入美化 */
-.file-label {
-  padding: 8px 16px;
-  background: #f1f5f9;
-  border: 1px dashed #cbd5e1;
-  border-radius: 8px;
-  font-size: 13px;
-  cursor: pointer;
-}
-.btn-upload {
-  background: #2563eb;
-  color: white;
-  border: none;
-  padding: 8px 16px;
-  border-radius: 8px;
-  font-weight: 600;
-  font-size: 13px;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-.btn-upload:disabled {
-  background: #94a3b8;
-}
-
-/* 聊天主体 */
-.chat-main {
-  flex: 1;
-  overflow-y: auto;
-  padding: 20px;
-}
-.chat-wrapper {
-  max-width: 800px;
-  margin: 0 auto;
-}
-
-/* 消息气泡头部优化 */
-.role-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 6px;
-}
-
-.role-name {
-  font-size: 10px;
-  font-weight: 700;
-  text-transform: uppercase;
-  opacity: 0.7;
-}
-
-.thinking-tag {
-  font-size: 10px;
-  background: #f1f5f9;
-  color: #64748b;
-  padding: 2px 6px;
-  border-radius: 6px;
-  font-weight: 500;
-}
-
-/* 气泡样式微调 */
-.message-row {
-  display: flex;
   gap: 12px;
-  margin-bottom: 24px;
 }
-.message-row.user {
+.header-info h2 {
+  font-size: 16px;
+  margin: 0;
+  color: #303133;
+}
+
+/* 核心：消息区域自适应滚动 */
+.message-container {
+  flex: 1; /* 自动撑满剩余空间 */
+  overflow-y: auto; /* 只有这里产生滚动条 */
+  padding: 30px 20px;
+  scroll-behavior: smooth;
+}
+.message-list-inner {
+  max-width: 900px; /* 居中限制宽度，在大屏幕下更美观 */
+  margin: 0 auto;
+}
+
+/* 消息气泡美化 */
+.msg-row {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 24px;
+  transition: all 0.3s ease;
+}
+.msg-row.user {
   flex-direction: row-reverse;
 }
-.avatar {
-  width: 36px;
-  height: 36px;
-  background: white;
-  border: 1px solid #e2e8f0;
-  border-radius: 10px;
+
+.msg-bubble {
+  border-radius: 12px;
+  margin-top: 4px;
+  max-width: fit-content;
+}
+.user .msg-bubble {
+  background-color: #409eff;
+  color: #fff;
+  border: none;
+}
+.assistant .msg-bubble {
+  background-color: #fff;
+  border: 1px solid #eef0f2;
+}
+
+.msg-meta {
   display: flex;
   align-items: center;
-  justify-content: center;
-  font-size: 20px;
-  flex-shrink: 0;
-}
-.bubble {
-  max-width: 85%;
-  padding: 12px 16px;
-  border-radius: 16px;
-  position: relative;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-}
-.user .bubble {
-  background: #2563eb;
-  color: white;
-  border-bottom-right-radius: 2px;
-}
-.assistant .bubble {
-  background: white;
-  border: 1px solid #e2e8f0;
-  border-bottom-left-radius: 2px;
-}
-
-/* 欢迎卡片 */
-.welcome-card {
-  text-align: center;
-  padding: 60px 20px;
-  color: #64748b;
-}
-.bot-avatar-large {
-  font-size: 50px;
-  margin-bottom: 20px;
-}
-.hints {
-  display: flex;
-  justify-content: center;
   gap: 10px;
-  margin-top: 20px;
-}
-.hints span {
-  background: white;
-  border: 1px solid #e2e8f0;
-  padding: 6px 12px;
-  border-radius: 20px;
-  font-size: 12px;
-}
-
-/* 底部输入框 */
-.input-footer {
-  padding: 20px;
-  background: white;
-  border-top: 1px solid #e2e8f0;
-}
-.input-container {
-  max-width: 800px;
-  margin: 0 auto;
-  display: flex;
-  gap: 12px;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  padding: 8px;
-  border-radius: 12px;
-}
-textarea {
-  flex: 1;
-  background: transparent;
-  border: none;
-  outline: none;
-  padding: 8px;
-  resize: none;
-  font-size: 14px;
-}
-.btn-send {
-  background: #2563eb;
-  color: white;
-  border: none;
-  padding: 0 20px;
-  border-radius: 8px;
-  font-weight: 600;
-  cursor: pointer;
-}
-.btn-send:disabled {
-  background: #cbd5e1;
-}
-.btn-stop {
-  background: #ef4444;
-  color: white;
-  border: none;
-  padding: 0 20px;
-  border-radius: 8px;
-  cursor: pointer;
-}
-
-/* Markdown 样式 */
-.markdown-body :deep(p) {
-  margin-bottom: 10px;
-  line-height: 1.6;
-}
-.markdown-body :deep(ul) {
-  padding-left: 20px;
-  margin-bottom: 10px;
-}
-.markdown-body :deep(li) {
-  list-style: disc;
   margin-bottom: 4px;
-}
-.markdown-body :deep(strong) {
-  font-weight: bold;
-}
-
-/* 思考动画与时长显示 */
-.loading-row {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  color: #64748b;
   font-size: 12px;
-  margin-bottom: 24px;
+  color: #909399;
 }
-.typing-indicator {
+.user .msg-meta {
+  flex-direction: row-reverse;
+}
+
+/* 底部输入框美化 */
+.footer-input {
+  background-color: #fff;
+  padding: 16px 20px 30px;
+  border-top: 1px solid #f0f2f5;
+}
+.input-card {
+  max-width: 900px;
+  margin: 0 auto;
+  border: 1px solid #dcdfe6;
+  border-radius: 12px;
+  padding: 8px;
+  background: #fff;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
   display: flex;
-  gap: 4px;
+  flex-direction: column;
 }
-.typing-indicator span {
-  width: 6px;
-  height: 6px;
-  background: #2563eb;
+.input-card :deep(.el-textarea__inner) {
+  border: none;
+  box-shadow: none;
+  padding: 8px;
+  font-size: 15px;
+}
+.input-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 8px;
+}
+
+/* 欢迎卡片美化 */
+.welcome-box {
+  text-align: center;
+}
+.bot-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+.hint-tags {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  margin-top: 16px;
+}
+.clickable-tag {
+  cursor: pointer;
+}
+.clickable-tag:hover {
+  border-color: #409eff;
+}
+
+/* 思考动画 */
+.thinking-box {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #909399;
+  font-size: 13px;
+}
+.dot-typing {
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
-  animation: blink 1.4s infinite both;
+  background-color: #409eff;
+  animation: dot-beat 1s infinite alternate;
 }
-.typing-indicator span:nth-child(2) {
-  animation-delay: 0.2s;
-}
-.typing-indicator span:nth-child(3) {
-  animation-delay: 0.4s;
-}
-@keyframes blink {
-  0%,
-  80%,
-  100% {
-    opacity: 0;
+@keyframes dot-beat {
+  to {
+    transform: scale(1.5);
+    opacity: 0.4;
   }
-  40% {
-    opacity: 1;
-  }
-}
-
-.hidden-input {
-  display: none;
-}
-
-.chat-wrapper {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-}
-.chat-container {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-}
-/* 深度修改子组件高度，填满卡片 */
-:deep(.rag-chat-box) {
-  height: 100%;
 }
 </style>
