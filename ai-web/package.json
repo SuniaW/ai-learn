@@ -17,6 +17,7 @@
     "format": "prettier --write --experimental-cli src/"
   },
   "dependencies": {
+    "@microsoft/fetch-event-source": "^2.0.1",
     "axios": "^1.6.0",
     "element-plus": "^2.13.2",
     "markdown-it": "^14.1.1",
