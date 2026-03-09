@@ -1,5 +1,5 @@
 <template>
-  <div class="app-container">
+  <div class="chat-wrapper">
     <!-- 1. 顶部导航与文档上传 -->
     <header class="glass-header">
       <div class="header-content">
@@ -249,16 +249,6 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-/* 原有基础样式保持不变 ... */
-.app-container {
-  display: flex;
-  flex-direction: column;
-  height: 100vh;
-  background-color: #f8fafc;
-  color: #1e293b;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-}
-
 /* 顶部样式 */
 .glass-header {
   background: rgba(255, 255, 255, 0.9);
@@ -518,5 +508,20 @@ textarea {
 
 .hidden-input {
   display: none;
+}
+
+.chat-wrapper {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+.chat-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+/* 深度修改子组件高度，填满卡片 */
+:deep(.rag-chat-box) {
+  height: 100%;
 }
 </style>
