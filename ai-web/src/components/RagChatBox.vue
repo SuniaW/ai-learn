@@ -48,7 +48,14 @@
         <div v-for="(msg, index) in messages" :key="index" :class="['message-row', msg.role]">
           <div class="avatar">{{ msg.role === 'user' ? '👤' : '🤖' }}</div>
           <div class="bubble">
-            <div class="role-name">{{ msg.role === 'user' ? '我的提问' : '政策智库助手' }}</div>
+            <div class="role-header">
+              <span class="role-name">{{ msg.role === 'user' ? '我的提问' : '政策智库助手' }}</span>
+              <!-- 只有助手且有计时时显示 -->
+              <span v-if="msg.role === 'assistant' && msg.duration" class="thinking-tag">
+                ⏱️ 思考 {{ msg.duration.toFixed(1) }}s
+              </span>
+            </div>
+
             <!-- Markdown 渲染内容 -->
             <div
               v-if="msg.role === 'assistant'"
@@ -62,7 +69,7 @@
         <!-- 思考中状态 -->
         <div v-if="isLoading" class="loading-row">
           <div class="typing-indicator"><span></span><span></span><span></span></div>
-          <p>AI 正在检索政策库并思考中...</p>
+          <p>AI 正在检索政策库并思考中... ({{ currentThinkingTime.toFixed(1) }}s)</p>
         </div>
       </div>
     </main>
@@ -94,15 +101,39 @@ const md = new MarkdownIt()
 const renderMarkdown = (content: string) => (content ? md.render(content) : '')
 
 // 状态变量
+interface Message {
+  role: 'user' | 'assistant'
+  content: string
+  duration?: number // 记录思考时长
+}
+
 const selectedFile = ref<File | null>(null)
 const isUploading = ref(false)
 const uploadStatus = ref('')
 const queryInput = ref('')
-const messages = ref<{ role: 'user' | 'assistant'; content: string }[]>([])
+const messages = ref<Message[]>([])
 const isLoading = ref(false)
 const chatContainer = ref<HTMLElement | null>(null)
 const API_BASE = '/api'
 let abortController = new AbortController()
+
+// 计时器变量
+const currentThinkingTime = ref(0)
+let thinkingTimer: number | null = null
+
+const startThinkingTimer = () => {
+  currentThinkingTime.value = 0
+  thinkingTimer = window.setInterval(() => {
+    currentThinkingTime.value += 0.1
+  }, 100)
+}
+
+const stopThinkingTimer = () => {
+  if (thinkingTimer) {
+    clearInterval(thinkingTimer)
+    thinkingTimer = null
+  }
+}
 
 // 上传文档逻辑
 const handleFileChange = (e: Event) => {
@@ -132,7 +163,6 @@ const uploadFile = async () => {
 const sendQuery = async () => {
   if (!queryInput.value.trim() || isLoading.value) return
 
-  // 1. 强制终止之前的请求并清理状态
   abortController.abort()
   abortController = new AbortController()
 
@@ -141,37 +171,39 @@ const sendQuery = async () => {
   queryInput.value = ''
   isLoading.value = true
 
+  // 开始计时
+  startThinkingTimer()
+
   messages.value.push({ role: 'assistant', content: '' })
   const lastIdx = messages.value.length - 1
+  let isFirstChunk = true
 
   try {
-    // 2. 使用原生 fetch，它绝对不会自动重试
     const response = await fetch(`${API_BASE}/chat?query=${encodeURIComponent(userText)}`, {
       method: 'GET',
       signal: abortController.signal,
     })
 
-    if (!response.ok) {
-      throw new Error(`HTTP Error: ${response.status}`)
-    }
-
+    if (!response.ok) throw new Error(`HTTP Error: ${response.status}`)
     if (!response.body) throw new Error('ReadableStream not supported')
 
     const reader = response.body.getReader()
     const decoder = new TextDecoder()
-    let buffer = '' // 处理 SSE 数据分片
+    let buffer = ''
 
-    // 3. 手动读取流
     while (true) {
       const { done, value } = await reader.read()
       if (done) break
 
-      // 解码当前片段并拼接到 buffer
-      buffer += decoder.decode(value, { stream: true })
+      // 核心：当收到第一块数据时，停止计时并记录时长
+      if (isFirstChunk) {
+        stopThinkingTimer()
+        messages.value[lastIdx].duration = currentThinkingTime.value
+        isFirstChunk = false
+      }
 
-      // 按 SSE 规范解析行
+      buffer += decoder.decode(value, { stream: true })
       const lines = buffer.split('\n')
-      // 最后一行可能不完整，留到下个 chunk
       buffer = lines.pop() || ''
 
       for (const line of lines) {
@@ -186,31 +218,38 @@ const sendQuery = async () => {
       }
     }
   } catch (error: unknown) {
-    console.error('请求终结:', error)
+    stopThinkingTimer()
     if (error instanceof Error && error.name === 'AbortError') {
-      console.log('用户手动停止了请求')
+      console.log('User stopped')
     } else {
-      messages.value[lastIdx].content += '\n\n⚠️ [已停止] 连接异常或服务器响应超时。'
+      messages.value[lastIdx].content += '\n\n⚠️ [已停止] 服务响应超时或异常。'
     }
   } finally {
     isLoading.value = false
+    stopThinkingTimer()
   }
 }
 
 const stopGeneration = () => {
   abortController.abort()
   isLoading.value = false
+  stopThinkingTimer()
 }
+
 const scrollToBottom = () => {
   nextTick(() => {
     if (chatContainer.value) chatContainer.value.scrollTop = chatContainer.value.scrollHeight
   })
 }
-onUnmounted(() => abortController.abort())
+
+onUnmounted(() => {
+  abortController.abort()
+  stopThinkingTimer()
+})
 </script>
 
 <style scoped>
-/* 全局基础样式 */
+/* 原有基础样式保持不变 ... */
 .app-container {
   display: flex;
   flex-direction: column;
@@ -290,7 +329,31 @@ onUnmounted(() => abortController.abort())
   margin: 0 auto;
 }
 
-/* 消息气泡 */
+/* 消息气泡头部优化 */
+.role-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.role-name {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  opacity: 0.7;
+}
+
+.thinking-tag {
+  font-size: 10px;
+  background: #f1f5f9;
+  color: #64748b;
+  padding: 2px 6px;
+  border-radius: 6px;
+  font-weight: 500;
+}
+
+/* 气泡样式微调 */
 .message-row {
   display: flex;
   gap: 12px;
@@ -312,11 +375,11 @@ onUnmounted(() => abortController.abort())
   flex-shrink: 0;
 }
 .bubble {
-  max-width: 80%;
+  max-width: 85%;
   padding: 12px 16px;
   border-radius: 16px;
   position: relative;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
 }
 .user .bubble {
   background: #2563eb;
@@ -327,13 +390,6 @@ onUnmounted(() => abortController.abort())
   background: white;
   border: 1px solid #e2e8f0;
   border-bottom-left-radius: 2px;
-}
-.role-name {
-  font-size: 10px;
-  font-weight: 700;
-  text-transform: uppercase;
-  margin-bottom: 4px;
-  opacity: 0.7;
 }
 
 /* 欢迎卡片 */
@@ -423,11 +479,18 @@ textarea {
   font-weight: bold;
 }
 
-/* 思考动画 */
+/* 思考动画与时长显示 */
+.loading-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: #64748b;
+  font-size: 12px;
+  margin-bottom: 24px;
+}
 .typing-indicator {
   display: flex;
   gap: 4px;
-  margin-bottom: 8px;
 }
 .typing-indicator span {
   width: 6px;
