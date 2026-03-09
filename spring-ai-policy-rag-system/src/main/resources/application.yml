@@ -1,6 +1,11 @@
 spring:
   application:
     name: policy-rag-system
+
+  mvc:
+    async:
+      request-timeout: 60000  # 设置为 60 秒，确保比业务代码的 30s 长
+
   ai:
     ollama:
       # 远程 Ollama 地址
