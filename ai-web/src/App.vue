@@ -18,7 +18,7 @@
           </el-menu-item>
           <el-menu-item index="/chat/code">
             <el-icon><MagicStick /></el-icon>
-            <span>编程辅助专家</span>
+            <span>AI 天气智能助手</span>
           </el-menu-item>
         </el-menu-item-group>
       </el-menu>
