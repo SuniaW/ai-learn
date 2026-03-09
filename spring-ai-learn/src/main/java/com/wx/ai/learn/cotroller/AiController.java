@@ -6,7 +6,6 @@
  */
 package com.wx.ai.learn.cotroller;
 
-import com.wx.ai.learn.service.AiService;
 import com.wx.ai.learn.service.WeatherService;
 import jakarta.annotation.Resource;
 import org.slf4j.Logger;
@@ -24,8 +23,6 @@ import reactor.core.publisher.Flux;
 @RequestMapping("/ai")
 public class AiController {
     private static final Logger LOGGER = LoggerFactory.getLogger(AiController.class);
-    @Resource
-    private AiService aiService;
 
     @Resource
     private WeatherService weatherService;
@@ -37,6 +34,15 @@ public class AiController {
         this.chatModel = chatModel;
     }
 
+
+    @GetMapping(value = "/weather/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public Flux<String> weatherStream(@RequestParam(value = "city", defaultValue = "北京") String city) {
+        // 简单的后端校验
+        if (!city.matches("^[a-zA-Z\\u4e00-\\u9fa5\\s·]+$")) {
+            return Flux.just("无效的城市名");
+        }
+        return weatherService.doWorkStream(city);
+    }
 
     @GetMapping("/weather")
     public String weather(@RequestParam(value = "city", defaultValue = "Paris") String city) {

@@ -19,21 +19,37 @@ import org.springframework.context.annotation.Primary;
 public class AiConfig {
 
     @Bean
-    @Primary  // 设置为默认，不加 Qualifier 时优先选这个
+    @Primary
     public ChatClient chatClient(ChatClient.Builder builder) {
-        return builder.defaultSystem("You are a helpful assistant.").defaultAdvisors().build();
+        return builder.defaultSystem("You are a helpful assistant.").build();
     }
 
+    // 1. 标准天气客户端：包含自我修正，用于 .call()
     @Bean
-    public ChatClient weatherChatClient(ChatClient.Builder builder, // 注入 Spring Boot 自动配置的 Builder 基础实例
-                                        ChatModel chatModel) {
-        // 在此处集中配置通用的工具、顾问和模型
-        return builder.defaultSystem("你是一个专业的气象助手。").defaultTools(new WeatherTool()) // 注册工具类
-                .defaultAdvisors(
-                        // 1. 自我修正评估顾问（使用本地 Ollama 模型进行评估）
-                        SelfRefineEvaluationAdvisor.builder().chatClientBuilder(ChatClient.builder(chatModel)).maxRepeatAttempts(15).successRating(4).order(0).build(),
-                        // 2. 自定义日志顾问
-                        new MyLoggingAdvisor(2)).build();
+    public ChatClient weatherChatClient(ChatClient.Builder builder, ChatModel chatModel) {
+        return builder
+            .defaultSystem("你是一个专业的气象助手。")
+            .defaultTools(new WeatherTool())
+            .defaultAdvisors(
+                // 自我修正顾问
+                SelfRefineEvaluationAdvisor.builder()
+                    .chatClientBuilder(ChatClient.builder(chatModel))
+                    .maxRepeatAttempts(15)
+                    .successRating(4)
+                    .build(),
+                new MyLoggingAdvisor(2)
+            )
+            .build();
     }
 
+    // 2. 流式天气客户端：去掉自我修正，用于 .stream()
+    // 注意：名字区分开
+    @Bean
+    public ChatClient weatherStreamingChatClient(ChatClient.Builder builder) {
+        return builder
+            .defaultSystem("你是一个专业的气象助手。")
+            .defaultTools(new WeatherTool()) // 依然可以调用天气工具
+            .defaultAdvisors(new MyLoggingAdvisor(2)) // 仅保留日志，去掉 SelfRefine
+            .build();
+    }
 }
