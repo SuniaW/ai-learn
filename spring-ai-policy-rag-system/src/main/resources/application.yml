@@ -4,7 +4,7 @@ spring:
 
   mvc:
     async:
-      request-timeout: 60000  # 设置为 60 秒，确保比业务代码的 30s 长
+      request-timeout: 600000  # 设置为 60 秒，确保比业务代码的 30s 长
 
   ai:
     ollama:

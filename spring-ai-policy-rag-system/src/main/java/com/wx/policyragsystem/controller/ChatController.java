@@ -21,8 +21,8 @@ public class ChatController {
 
     // 流式问答接口 (SSE)
     @GetMapping(value = "/chat", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public Flux<String> chat(@RequestParam String query) {
-        return ragService.streamAnswer(query);
+    public Flux<String> chat(@RequestParam String query,  @RequestParam(required = false) String chatId) {
+        return ragService.streamAnswer(query, chatId);
     }
 
     // 文档上传接口
