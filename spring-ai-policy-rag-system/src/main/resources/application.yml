@@ -11,7 +11,7 @@ spring:
       # 远程 Ollama 地址
       base-url: http://8.140.221.150:11434
       chat:
-        model: qwen2.5:1.5b
+        model: qwen2.5:0.5b
         options:
           temperature: 0.3      # 严谨模式，适合政策解读
           top-p: 0.9           # 保持回答的连贯性
