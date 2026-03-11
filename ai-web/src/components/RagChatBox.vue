@@ -18,35 +18,36 @@
       </div>
 
       <div class="upload-actions">
-        <el-popover
-          v-if="uiFileList.length > 0"
-          placement="bottom-end"
-          :width="320"
-          trigger="hover"
-          popper-class="custom-file-popover"
-        >
-          <template #reference>
-            <el-button link class="file-count-trigger">
-              <el-icon><Files /></el-icon>
-              <span>待处理文档 ({{ uiFileList.length }})</span>
-            </el-button>
-          </template>
+        <div class="action-buttons">
+          <el-popover
+            v-if="uiFileList.length > 0"
+            placement="bottom-end"
+            :width="320"
+            trigger="hover"
+            popper-class="custom-file-popover"
+          >
+            <template #reference>
+              <el-button link class="file-count-trigger">
+                <el-icon><Files /></el-icon>
+                <span>待处理文档 ({{ uiFileList.length }})</span>
+              </el-button>
+            </template>
 
-          <div class="popover-file-container">
-            <div class="popover-header">已选择的文档</div>
-            <div class="popover-list">
-              <div v-for="file in uiFileList" :key="file.uid" class="popover-item">
-                <div class="file-info">
-                  <el-icon class="file-icon"><Document /></el-icon>
-                  <span class="file-name" :title="file.name">{{ file.name }}</span>
+            <div class="popover-file-container">
+              <div class="popover-header">已选择的文档</div>
+              <div class="popover-list">
+                <div v-for="file in uiFileList" :key="file.uid" class="popover-item">
+                  <div class="file-info">
+                    <el-icon class="file-icon"><Document /></el-icon>
+                    <span class="file-name" :title="file.name">{{ file.name }}</span>
+                  </div>
+                  <el-icon class="remove-icon" @click="handleFileRemove(file)"
+                    ><CircleClose
+                  /></el-icon>
                 </div>
-                <el-icon class="remove-icon" @click="handleFileRemove(file)"><CircleClose /></el-icon>
               </div>
             </div>
-          </div>
-        </el-popover>
-
-        <div class="action-buttons">
+          </el-popover>
           <el-upload
             action="#"
             multiple
@@ -60,7 +61,6 @@
               <el-button class="secondary-btn" round :icon="Link">选择文档</el-button>
             </template>
           </el-upload>
-
           <el-button
             type="primary"
             class="primary-btn"
@@ -154,10 +154,10 @@
           </div>
           <div class="msg-content-area">
             <div class="thinking-card">
-              <div class="loader-dots">
-                <span></span><span></span><span></span>
-              </div>
-              <span class="thinking-text">AI 正在思考... ({{ currentThinkingTime.toFixed(1) }}s)</span>
+              <div class="loader-dots"><span></span><span></span><span></span></div>
+              <span class="thinking-text"
+                >AI 正在思考... ({{ currentThinkingTime.toFixed(1) }}s)</span
+              >
             </div>
           </div>
         </div>
@@ -223,10 +223,14 @@ import type { UploadFile, UploadUserFile } from 'element-plus'
 
 // --- Markdown 配置 ---
 const md = new MarkdownIt({
-  html: true, linkify: true, breaks: true,
+  html: true,
+  linkify: true,
+  breaks: true,
   highlight: (str, lang) => {
     if (lang && hljs.getLanguage(lang)) {
-      try { return `<pre class="hljs"><code>${hljs.highlight(str, { language: lang, ignoreIllegals: true }).value}</code></pre>` } catch (__) {}
+      try {
+        return `<pre class="hljs"><code>${hljs.highlight(str, { language: lang, ignoreIllegals: true }).value}</code></pre>`
+      } catch (__) {}
     }
     return `<pre class="hljs"><code>${md.utils.escapeHtml(str)}</code></pre>`
   },
@@ -241,7 +245,11 @@ const renderMarkdown = (content: string) => (content ? md.render(preprocessMarkd
 const userAvatar = 'https://api.dicebear.com/7.x/avataaars/svg?seed=Felix'
 const botAvatar = 'https://api.dicebear.com/7.x/bottts/svg?seed=Aneka'
 
-interface Message { role: 'user' | 'assistant'; content: string; duration?: number }
+interface Message {
+  role: 'user' | 'assistant'
+  content: string
+  duration?: number
+}
 const messages = ref<Message[]>([])
 const queryInput = ref('')
 const selectedFiles = ref<File[]>([])
@@ -285,14 +293,25 @@ const uploadFiles = async () => {
   isUploading.value = true
   uploadPercent.value = 0
   const formData = new FormData()
-  selectedFiles.value.forEach((file) => { formData.append('files', file) })
+  selectedFiles.value.forEach((file) => {
+    formData.append('files', file)
+  })
   try {
     await axios.post('/api/upload', formData, {
-      onUploadProgress: (p) => { uploadPercent.value = Math.round((p.loaded * 100) / (p.total || 100)) },
+      onUploadProgress: (p) => {
+        uploadPercent.value = Math.round((p.loaded * 100) / (p.total || 100))
+      },
     })
     ElMessage.success('上传成功')
-    selectedFiles.value = []; uiFileList.value = []
-  } catch (e) { ElMessage.error('上传失败') } finally { setTimeout(() => { isUploading.value = false }, 800) }
+    selectedFiles.value = []
+    uiFileList.value = []
+  } catch (e) {
+    ElMessage.error('上传失败')
+  } finally {
+    setTimeout(() => {
+      isUploading.value = false
+    }, 800)
+  }
 }
 
 const sendQuery = async () => {
@@ -300,30 +319,71 @@ const sendQuery = async () => {
   const userText = queryInput.value
   messages.value.push({ role: 'user', content: userText })
   queryInput.value = ''
-  isLoading.value = true; isWaiting.value = true
+  isLoading.value = true
+  isWaiting.value = true
   startThinkingTimer()
   const lastIdx = messages.value.push({ role: 'assistant', content: '' }) - 1
   try {
     const chatId = window.localStorage.getItem('rag_chat_id') || crypto.randomUUID()
     window.localStorage.setItem('rag_chat_id', chatId)
-    const response = await fetch(`/api/chat?query=${encodeURIComponent(userText)}&chatId=${chatId}`, { signal: abortController.signal })
+    const response = await fetch(
+      `/api/chat?query=${encodeURIComponent(userText)}&chatId=${chatId}`,
+      { signal: abortController.signal },
+    )
     if (!response.body) return
-    const reader = response.body.getReader(); const decoder = new TextDecoder()
+    const reader = response.body.getReader()
+    const decoder = new TextDecoder()
     while (true) {
-      const { done, value } = await reader.read(); if (done) break
-      if (isWaiting.value) { stopThinkingTimer(); messages.value[lastIdx].duration = currentThinkingTime.value; isWaiting.value = false }
+      const { done, value } = await reader.read()
+      if (done) break
+      if (isWaiting.value) {
+        stopThinkingTimer()
+        messages.value[lastIdx].duration = currentThinkingTime.value
+        isWaiting.value = false
+      }
       const chunk = decoder.decode(value)
       const lines = chunk.split('\n')
-      for (const line of lines) { if (line.trim().startsWith('data:')) { messages.value[lastIdx].content += line.trim().substring(5); scrollToBottom() } }
+      for (const line of lines) {
+        if (line.trim().startsWith('data:')) {
+          messages.value[lastIdx].content += line.trim().substring(5)
+          scrollToBottom()
+        }
+      }
     }
-  } catch (e) { console.error(e) } finally { isLoading.value = false; isWaiting.value = false; stopThinkingTimer() }
+  } catch (e) {
+    console.error(e)
+  } finally {
+    isLoading.value = false
+    isWaiting.value = false
+    stopThinkingTimer()
+  }
 }
 
-const handleExampleClick = (query: string) => { queryInput.value = query; sendQuery() }
-const startThinkingTimer = () => { currentThinkingTime.value = 0; thinkingTimer = window.setInterval(() => { currentThinkingTime.value += 0.1 }, 100) }
-const stopThinkingTimer = () => { if (thinkingTimer) clearInterval(thinkingTimer) }
-const stopGeneration = () => { abortController.abort(); abortController = new AbortController(); isLoading.value = false; isWaiting.value = false; stopThinkingTimer() }
-const scrollToBottom = () => { nextTick(() => { if (chatContainer.value) chatContainer.value.scrollTop = chatContainer.value.scrollHeight }) }
+const handleExampleClick = (query: string) => {
+  queryInput.value = query
+  sendQuery()
+}
+const startThinkingTimer = () => {
+  currentThinkingTime.value = 0
+  thinkingTimer = window.setInterval(() => {
+    currentThinkingTime.value += 0.1
+  }, 100)
+}
+const stopThinkingTimer = () => {
+  if (thinkingTimer) clearInterval(thinkingTimer)
+}
+const stopGeneration = () => {
+  abortController.abort()
+  abortController = new AbortController()
+  isLoading.value = false
+  isWaiting.value = false
+  stopThinkingTimer()
+}
+const scrollToBottom = () => {
+  nextTick(() => {
+    if (chatContainer.value) chatContainer.value.scrollTop = chatContainer.value.scrollHeight
+  })
+}
 onUnmounted(() => stopThinkingTimer())
 </script>
 
@@ -335,7 +395,8 @@ onUnmounted(() => stopThinkingTimer())
   height: calc(100vh - 60px);
   background-color: #f9fafb;
   color: #1f2937;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
 }
 
 /* Header 优化 */
@@ -400,9 +461,18 @@ onUnmounted(() => stopThinkingTimer())
 }
 
 @keyframes pulse {
-  0% { transform: scale(0.95); opacity: 0.5; }
-  50% { transform: scale(1.1); opacity: 1; }
-  100% { transform: scale(0.95); opacity: 0.5; }
+  0% {
+    transform: scale(0.95);
+    opacity: 0.5;
+  }
+  50% {
+    transform: scale(1.1);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(0.95);
+    opacity: 0.5;
+  }
 }
 
 /* 上传动作区 */
@@ -439,10 +509,8 @@ onUnmounted(() => stopThinkingTimer())
 /* 消息容器 */
 .message-container {
   flex: 1;
-  overflow-y: auto;
-  padding: 40px 0;
-  scrollbar-width: thin;
-  scrollbar-color: #e5e7eb transparent;
+  max-height: 360px;
+  padding: 10px 0;
 }
 
 .message-list-inner {
@@ -454,7 +522,7 @@ onUnmounted(() => stopThinkingTimer())
 /* 欢迎界面 */
 .welcome-hero {
   text-align: center;
-  margin-bottom: 48px;
+  margin-bottom: 8px;
 }
 
 .hero-icon-container {
@@ -467,8 +535,13 @@ onUnmounted(() => stopThinkingTimer())
 }
 
 @keyframes float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-10px); }
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
 }
 
 .welcome-title {
@@ -508,7 +581,7 @@ onUnmounted(() => stopThinkingTimer())
 .example-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 16px;
+  gap: 10px;
 }
 
 .modern-card {
@@ -519,7 +592,7 @@ onUnmounted(() => stopThinkingTimer())
   display: flex;
   cursor: pointer;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
 .modern-card:hover {
@@ -534,7 +607,7 @@ onUnmounted(() => stopThinkingTimer())
 }
 
 .card-content {
-  padding: 16px;
+  padding: 4px;
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -544,8 +617,8 @@ onUnmounted(() => stopThinkingTimer())
 .card-header {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-bottom: 12px;
+  gap: 2px;
+  margin-bottom: 2px;
 }
 
 .card-icon {
@@ -579,8 +652,14 @@ onUnmounted(() => stopThinkingTimer())
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .msg-wrapper.user {
@@ -635,7 +714,7 @@ onUnmounted(() => stopThinkingTimer())
   border: 1px solid #e5e7eb;
   border-top-left-radius: 4px;
   color: #1f2937;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
 }
 
 /* 思考中状态美化 */
@@ -664,12 +743,24 @@ onUnmounted(() => stopThinkingTimer())
   animation: dot-pulse 1.4s infinite ease-in-out both;
 }
 
-.loader-dots span:nth-child(1) { animation-delay: -0.32s; }
-.loader-dots span:nth-child(2) { animation-delay: -0.16s; }
+.loader-dots span:nth-child(1) {
+  animation-delay: -0.32s;
+}
+.loader-dots span:nth-child(2) {
+  animation-delay: -0.16s;
+}
 
 @keyframes dot-pulse {
-  0%, 80%, 100% { transform: scale(0); opacity: 0.3; }
-  40% { transform: scale(1); opacity: 1; }
+  0%,
+  80%,
+  100% {
+    transform: scale(0);
+    opacity: 0.3;
+  }
+  40% {
+    transform: scale(1);
+    opacity: 1;
+  }
 }
 
 .thinking-text {
