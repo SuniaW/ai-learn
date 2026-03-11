@@ -6,10 +6,42 @@
         <div class="logo-box">🚀</div>
         <div class="title-wrapper">
           <h2 class="title-text">技术站 · 智库问答</h2>
+          <span class="status-tag">RAG Engine V2.0</span>
         </div>
       </div>
 
       <div class="upload-actions">
+        <!-- 优化点：文件列表改为气泡展示，不占用 Header 高度 -->
+        <el-popover
+          v-if="uiFileList.length > 0"
+          placement="bottom-end"
+          :width="300"
+          trigger="hover"
+          popper-class="file-list-popover"
+        >
+          <template #reference>
+            <el-button link type="primary" size="small" class="file-count-btn">
+              <el-icon><Files /></el-icon>
+              待处理文档 ({{ uiFileList.length }})
+            </el-button>
+          </template>
+
+          <div class="popover-file-container">
+            <div class="popover-header">已选择的文档</div>
+            <div class="popover-list">
+              <div v-for="file in uiFileList" :key="file.uid" class="popover-item">
+                <div class="file-info">
+                  <el-icon><Document /></el-icon>
+                  <span class="file-name" :title="file.name">{{ file.name }}</span>
+                </div>
+                <el-icon class="remove-icon" @click="handleFileRemove(file, uiFileList)"
+                  ><CircleClose
+                /></el-icon>
+              </div>
+            </div>
+          </div>
+        </el-popover>
+
         <!-- 多文件上传组件 -->
         <el-upload
           action="#"
@@ -18,13 +50,11 @@
           :on-change="handleFileChange"
           :on-remove="handleFileRemove"
           :file-list="uiFileList"
-          :show-file-list="true"
+          :show-file-list="false"
           class="upload-component"
         >
           <template #trigger>
-            <el-button class="glass-btn" round :icon="Link" size="small">
-              {{ selectedFiles.length > 0 ? `已选 ${selectedFiles.length} 个` : '选择文档' }}
-            </el-button>
+            <el-button class="glass-btn" round :icon="Link" size="small">选择文档</el-button>
           </template>
         </el-upload>
 
@@ -45,9 +75,7 @@
     <!-- 批量上传进度条 -->
     <div v-if="isUploading" class="progress-bar-wrapper">
       <el-progress :percentage="uploadPercent" :stroke-width="2" :show-text="false" />
-      <span class="progress-text"
-        >正在处理 {{ selectedFiles.length }} 个文档并构建索引: {{ uploadPercent }}%</span
-      >
+      <span class="progress-text">正在分析文档并构建索引: {{ uploadPercent }}%</span>
     </div>
 
     <!-- 2. 中间：消息显示区 -->
@@ -86,19 +114,14 @@
           </div>
         </div>
 
-        <!-- 消息列表 -->
         <div v-for="(msg, index) in messages" :key="index" :class="['msg-wrapper', msg.role]">
-          <el-avatar
-            :size="36"
-            :src="msg.role === 'assistant' ? botAvatar : userAvatar"
-            class="avatar"
-          />
+          <el-avatar :size="36" :src="msg.role === 'assistant' ? botAvatar : userAvatar" />
           <div class="msg-body">
             <div class="msg-meta" v-if="msg.role === 'assistant'">
               <span class="name-tag">智库助手</span>
-              <span v-if="msg.duration" class="time-tag"
-                ><el-icon><Timer /></el-icon>{{ msg.duration.toFixed(1) }}s</span
-              >
+              <span v-if="msg.duration" class="time-tag">
+                <el-icon><Timer /></el-icon>{{ msg.duration.toFixed(1) }}s
+              </span>
             </div>
             <div
               :class="[
@@ -112,20 +135,19 @@
           </div>
         </div>
 
-        <!-- 思考中 -->
         <div v-if="isLoading && isWaiting" class="msg-wrapper assistant">
           <el-avatar :size="36" :src="botAvatar" />
           <div class="msg-body">
             <div class="thinking-bubble">
               <div class="dot-typing"></div>
-              <span>AI 正在思考... ({{ currentThinkingTime.toFixed(1) }}s)</span>
+              <span>AI 正在思考...</span>
             </div>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- 3. 底部：输入区 -->
+    <!-- 3. 底部：输入区 (保持原样) -->
     <div class="footer-input">
       <div class="input-card-modern">
         <el-input
@@ -169,7 +191,7 @@
 
 <script setup lang="ts">
 import { ref, nextTick, onUnmounted } from 'vue'
-import { Link, Right, Timer, Position, Files, CircleClose } from '@element-plus/icons-vue'
+import { Link, Right, Timer, Position, Files, CircleClose, Document } from '@element-plus/icons-vue'
 import axios from 'axios'
 import MarkdownIt from 'markdown-it'
 import hljs from 'highlight.js'
@@ -228,7 +250,7 @@ const exampleQuestions = [
   { icon: '📝', query: 'docker简介', color: '#3b82f6' },
   { icon: '🛡️', query: 'milvus简介', color: '#10b981' },
   { icon: '🚀', query: 'ollama简介', color: '#f59e0b' },
-  { icon: '🔍', query: '如何在Linux上部署docker', color: '#8b5cf6' }
+  { icon: '🔍', query: '如何在Linux上部署docker', color: '#8b5cf6' },
 ]
 
 // --- 文件处理 ---
@@ -361,12 +383,12 @@ onUnmounted(() => stopThinkingTimer())
 .page-container {
   display: flex;
   flex-direction: column;
-  height: calc(100vh - 60px); /* 动态适配管理系统面包屑高度 */
+  height: calc(100vh - 60px);
   background: #f8fafc;
-  overflow: hidden; /* 禁止外层出现滚动条 */
+  overflow: hidden;
 }
 
-/* Header 紧凑化 */
+/* Header */
 .chat-header {
   flex-shrink: 0;
   height: 56px;
@@ -382,14 +404,10 @@ onUnmounted(() => stopThinkingTimer())
   align-items: center;
   gap: 12px;
 }
-.logo-box {
-  font-size: 20px;
-}
 .title-text {
   font-size: 16px;
   font-weight: 700;
   color: #0f172a;
-  white-space: nowrap;
   margin: 0;
 }
 .status-tag {
@@ -398,14 +416,71 @@ onUnmounted(() => stopThinkingTimer())
   background: #eff6ff;
   padding: 1px 6px;
   border-radius: 4px;
-  white-space: nowrap;
-}
-.upload-actions {
-  display: flex;
-  gap: 8px;
 }
 
-/* 消息区滚动控制 */
+/* 优化点：文件列表 Popover 样式 */
+.file-count-btn {
+  font-weight: 600;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.popover-file-container {
+  padding: 4px;
+}
+.popover-header {
+  font-size: 12px;
+  color: #94a3b8;
+  font-weight: 700;
+  margin-bottom: 8px;
+  border-bottom: 1px solid #f1f5f9;
+  padding-bottom: 4px;
+}
+.popover-list {
+  max-height: 200px;
+  overflow-y: auto;
+}
+.popover-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 0;
+  border-bottom: 1px dashed #f1f5f9;
+}
+.popover-item:last-child {
+  border-bottom: none;
+}
+.file-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow: hidden;
+}
+.file-name {
+  font-size: 13px;
+  color: #475569;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 200px;
+}
+.remove-icon {
+  color: #94a3b8;
+  cursor: pointer;
+  transition: 0.2s;
+}
+.remove-icon:hover {
+  color: #f87171;
+}
+
+.upload-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* 消息区 */
 .message-container {
   flex: 1;
   overflow-y: auto;
@@ -417,10 +492,7 @@ onUnmounted(() => stopThinkingTimer())
   padding: 0 20px;
 }
 
-/* 欢迎区紧凑化 - 解决截图中的文字溢出和滚动条问题 */
-.welcome-wrapper {
-  padding: 10px 0;
-}
+/* 欢迎页 */
 .welcome-hero {
   text-align: center;
   margin-bottom: 24px;
@@ -448,15 +520,13 @@ onUnmounted(() => stopThinkingTimer())
   color: #cbd5e1;
   font-size: 12px;
 }
-.section-divider span {
-  padding: 0 10px;
-}
 .section-divider::before,
 .section-divider::after {
   content: '';
   flex: 1;
   height: 1px;
   background: #e2e8f0;
+  margin: 0 10px;
 }
 
 .example-grid {
@@ -466,11 +536,11 @@ onUnmounted(() => stopThinkingTimer())
 }
 .modern-card {
   background: #fff;
-  border-radius: 12px;
   border: 1px solid #e2e8f0;
+  border-radius: 12px;
   display: flex;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: 0.2s;
 }
 .modern-card:hover {
   transform: translateY(-2px);
@@ -480,35 +550,19 @@ onUnmounted(() => stopThinkingTimer())
 .card-left-line {
   width: 4px;
   flex-shrink: 0;
-  border-radius: 12px 0 0 12px;
 }
 .card-main {
   flex: 1;
   padding: 12px;
   overflow: hidden;
 }
-.card-header-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 4px;
-}
 .card-query {
   font-size: 13px;
   font-weight: 600;
   color: #334155;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.card-footer-row {
-  display: flex;
-  justify-content: space-between;
-  color: #94a3b8;
-  font-size: 11px;
 }
 
-/* 气泡美化 */
+/* 气泡 */
 .msg-wrapper {
   display: flex;
   margin-bottom: 20px;
@@ -517,14 +571,10 @@ onUnmounted(() => stopThinkingTimer())
 .msg-wrapper.user {
   flex-direction: row-reverse;
 }
-.msg-body {
-  max-content: 85%;
-}
 .msg-bubble {
   padding: 12px 16px;
   font-size: 14px;
   line-height: 1.6;
-  position: relative;
 }
 .user-bubble {
   background: #3b82f6;
@@ -534,18 +584,10 @@ onUnmounted(() => stopThinkingTimer())
 .assistant-bubble {
   background: #fff;
   border: 1px solid #e2e8f0;
-  color: #334155;
   border-radius: 4px 16px 16px 16px;
 }
-.msg-meta {
-  font-size: 11px;
-  color: #94a3b8;
-  margin-bottom: 4px;
-  display: flex;
-  gap: 8px;
-}
 
-/* 底部输入框固定 */
+/* 底部输入框 */
 .footer-input {
   flex-shrink: 0;
   padding: 12px 20px 20px;
@@ -558,13 +600,11 @@ onUnmounted(() => stopThinkingTimer())
   border: 1px solid #cbd5e1;
   border-radius: 16px;
   padding: 8px 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
 }
 :deep(.el-textarea__inner) {
   box-shadow: none !important;
   border: none !important;
   font-size: 14px;
-  padding: 4px 0 !important;
 }
 .input-toolbar {
   display: flex;
@@ -580,54 +620,5 @@ onUnmounted(() => stopThinkingTimer())
   display: flex;
   align-items: center;
   gap: 4px;
-}
-.send-btn {
-  padding: 6px 16px;
-  font-weight: 600;
-}
-
-/* 滚动条美化 */
-.message-container::-webkit-scrollbar {
-  width: 5px;
-}
-.message-container::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-  border-radius: 10px;
-}
-
-/* 思考态 */
-.thinking-bubble {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  color: #94a3b8;
-}
-.dot-typing {
-  width: 4px;
-  height: 4px;
-  background: #3b82f6;
-  border-radius: 50%;
-  animation: typing 1s infinite;
-}
-@keyframes typing {
-  0%,
-  100% {
-    transform: scale(1);
-    opacity: 0.5;
-  }
-  50% {
-    transform: scale(1.5);
-    opacity: 1;
-  }
-}
-
-@media (max-width: 768px) {
-  .example-grid {
-    grid-template-columns: 1fr;
-  }
-  .title-wrapper {
-    display: none;
-  }
 }
 </style>
