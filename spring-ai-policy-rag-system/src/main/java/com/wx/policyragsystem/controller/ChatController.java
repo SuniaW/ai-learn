@@ -27,8 +27,11 @@ public class ChatController {
 
     // 文档上传接口
     @PostMapping("/upload")
-    public String upload(@RequestParam("file") MultipartFile file) throws IOException {
-        ingestionService.processDocument(file);
-        return "上传并解析成功: " + file.getOriginalFilename();
+    public String upload(@RequestParam("files") MultipartFile[] files) {
+        if (files == null || files.length == 0) {
+            return "请选择文件";
+        }
+        ingestionService.processDocuments(files);
+        return "成功处理 " + files.length + " 个文件";
     }
 }

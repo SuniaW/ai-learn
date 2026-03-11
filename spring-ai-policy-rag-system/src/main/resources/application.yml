@@ -49,3 +49,4 @@ logging:
     # 彻底关闭一些无关紧要的框架警告，保持控制台整洁
     org.apache.catalina: INFO
     org.apache.tomcat: INFO
+    org.apache.tika.parser.external.ExternalParser: INFO

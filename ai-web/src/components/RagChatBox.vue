@@ -8,16 +8,22 @@
       </div>
 
       <div class="upload-actions">
+        <!-- 多文件上传组件 -->
         <el-upload
           action="#"
+          multiple
           :auto-upload="false"
           :on-change="handleFileChange"
-          :show-file-list="false"
+          :on-remove="handleFileRemove"
+          :file-list="uiFileList"
+          :show-file-list="true"
           class="upload-component"
         >
           <template #trigger>
             <el-button :icon="Link" round size="default">
-              {{ selectedFile ? truncateFileName(selectedFile.name) : '选择文件' }}
+              {{
+                selectedFiles.length > 0 ? `已选 ${selectedFiles.length} 个文件` : '选择文件(多选)'
+              }}
             </el-button>
           </template>
         </el-upload>
@@ -25,19 +31,21 @@
         <el-button
           type="primary"
           round
-          :disabled="!selectedFile"
+          :disabled="selectedFiles.length === 0"
           :loading="isUploading"
-          @click="uploadFile"
+          @click="uploadFiles"
         >
           上传入库
         </el-button>
       </div>
     </div>
 
-    <!-- 进度条 -->
+    <!-- 批量上传进度条 -->
     <div v-if="isUploading" class="progress-bar-wrapper">
       <el-progress :percentage="uploadPercent" :stroke-width="2" :show-text="false" />
-      <span class="progress-text">正在解析文档: {{ uploadPercent }}%</span>
+      <span class="progress-text"
+        >正在处理 {{ selectedFiles.length }} 个文档并构建索引: {{ uploadPercent }}%</span
+      >
     </div>
 
     <!-- 2. 中间：消息显示区 -->
@@ -48,7 +56,7 @@
           <div class="welcome-box">
             <div class="bot-icon">👨‍💻</div>
             <h3>技术文档智能助手</h3>
-            <p>基于 RAG 技术，为您解析本地文档中的核心架构与实现细节。</p>
+            <p>已支持多文档关联分析。请上传技术规格书或代码文档，我会为您精准解答。</p>
           </div>
         </div>
 
@@ -60,10 +68,12 @@
           <div class="msg-body">
             <div class="msg-meta" v-if="msg.role === 'assistant'">
               <span class="name">智库助手</span>
-              <span v-if="msg.duration" class="time">⏱️ {{ msg.duration.toFixed(1) }}s</span>
+              <span v-if="msg.duration" class="time"
+                >⏱️ 响应时长: {{ msg.duration.toFixed(1) }}s</span
+              >
             </div>
 
-            <!-- 气泡内容：如果是 assistant 且内容为空，则不显示气泡（等待思考状态） -->
+            <!-- 气泡：仅在有内容时显示，防止等待时出现空气泡 -->
             <div
               v-if="msg.content || msg.role === 'user'"
               :class="['msg-bubble', msg.role === 'assistant' ? 'markdown-body' : 'user-text']"
@@ -77,7 +87,7 @@
           <el-avatar v-if="msg.role === 'user'" :size="36" :src="userAvatar" class="avatar" />
         </div>
 
-        <!-- 思考中状态：仅在 isLoading 为真且最后一条消息还没开始吐字时显示 -->
+        <!-- 思考中状态：仅在等待首个数据块时显示 -->
         <div v-if="isLoading && isWaiting" class="msg-wrapper assistant">
           <el-avatar :size="36" :src="botAvatar" class="avatar" />
           <div class="msg-body">
@@ -97,14 +107,24 @@
           v-model="queryInput"
           type="textarea"
           :autosize="{ minRows: 1, maxRows: 6 }"
-          placeholder="请输入技术问题，按 Enter 发送..."
+          placeholder="请输入您在技术实现上的疑问..."
           @keydown.enter.prevent="sendQuery"
         />
         <div class="input-actions">
-          <span class="tip">支持 Markdown & 代码高亮渲染</span>
+          <span class="tip">✨ 支持代码高亮、多文档关联查询</span>
           <div class="btns">
-            <el-button v-if="isLoading" type="danger" size="small" @click="stopGeneration" round>停止生成</el-button>
-            <el-button v-else type="primary" size="small" :disabled="!queryInput.trim()" @click="sendQuery" round>发送</el-button>
+            <el-button v-if="isLoading" type="danger" size="small" @click="stopGeneration" round
+              >停止生成</el-button
+            >
+            <el-button
+              v-else
+              type="primary"
+              size="small"
+              :disabled="!queryInput.trim()"
+              @click="sendQuery"
+              round
+              >发送</el-button
+            >
           </div>
         </div>
       </div>
@@ -119,14 +139,15 @@ import axios from 'axios'
 import MarkdownIt from 'markdown-it'
 import hljs from 'highlight.js'
 import 'github-markdown-css/github-markdown-light.css'
-import 'highlight.js/styles/github-dark.css'
+import 'highlight.js/styles/github-dark.css' // 使用 Github Dark 主题，更适合代码展示
 import { ElMessage } from 'element-plus'
+import type { UploadFile, UploadUserFile } from 'element-plus'
 
 // --- Markdown 配置 ---
 const md = new MarkdownIt({
   html: true,
   linkify: true,
-  breaks: true,
+  breaks: true, // 重要：转换换行符，防止排版挤压
   highlight: (str, lang) => {
     if (lang && hljs.getLanguage(lang)) {
       try {
@@ -137,12 +158,15 @@ const md = new MarkdownIt({
   },
 })
 
+// 预处理：修复 AI 返回不规范（如标题前忘加换行）的问题
 const preprocessMarkdown = (text: string) => {
   if (!text) return ''
-  return text.replace(/([^\n])(#+\s)/g, '$1\n\n$2') // 修复标题挤占问题
+  return text
+    .replace(/([^\n])(#+\s)/g, '$1\n\n$2') // 给紧贴文字的标题加换行
+    .replace(/([^\n])(\d\.\s)/g, '$1\n$2') // 给紧贴文字的数字列表加换行
 }
 
-const renderMarkdown = (content: string) => content ? md.render(preprocessMarkdown(content)) : ''
+const renderMarkdown = (content: string) => (content ? md.render(preprocessMarkdown(content)) : '')
 
 // --- 状态管理 ---
 const userAvatar = 'https://api.dicebear.com/7.x/avataaars/svg?seed=Felix'
@@ -156,34 +180,57 @@ interface Message {
 
 const messages = ref<Message[]>([])
 const queryInput = ref('')
-const selectedFile = ref<File | null>(null)
+const selectedFiles = ref<File[]>([]) // 存储原始文件对象
+const uiFileList = ref<UploadUserFile[]>([]) // UI 展示列表
 const isUploading = ref(false)
 const uploadPercent = ref(0)
 const isLoading = ref(false)
-const isWaiting = ref(false) // 是否在等待 AI 响应第一块数据
+const isWaiting = ref(false)
 const currentThinkingTime = ref(0)
 const chatContainer = ref<HTMLElement | null>(null)
 let thinkingTimer: number | null = null
 let abortController = new AbortController()
 
-const truncateFileName = (name: string) => name.length > 12 ? name.substring(0, 12) + '...' : name
-const handleFileChange = (file: any) => { selectedFile.value = file.raw }
-
-const uploadFile = async () => {
-  if (!selectedFile.value) return
-  isUploading.value = true
-  const formData = new FormData()
-  formData.append('file', selectedFile.value)
-  try {
-    await axios.post('/api/upload', formData, {
-      onUploadProgress: (p) => { uploadPercent.value = Math.round((p.loaded * 100) / (p.total || 100)) }
-    })
-    ElMessage.success('文档上传并解析成功')
-    selectedFile.value = null
-  } catch (e) { ElMessage.error('上传失败') }
-  finally { setTimeout(() => isUploading.value = false, 800) }
+// --- 文件处理 ---
+const handleFileChange = (file: UploadFile, fileList: UploadFile[]) => {
+  selectedFiles.value = fileList.map((f) => f.raw as File)
+  uiFileList.value = fileList as UploadUserFile[]
 }
 
+const handleFileRemove = (file: UploadFile, fileList: UploadFile[]) => {
+  selectedFiles.value = fileList.map((f) => f.raw as File)
+  uiFileList.value = fileList as UploadUserFile[]
+}
+
+const uploadFiles = async () => {
+  if (selectedFiles.value.length === 0) return
+  isUploading.value = true
+  uploadPercent.value = 0
+
+  const formData = new FormData()
+  selectedFiles.value.forEach((file) => {
+    formData.append('files', file) // 必须与后端 @RequestParam("files") 一致
+  })
+
+  try {
+    await axios.post('/api/upload', formData, {
+      onUploadProgress: (p) => {
+        uploadPercent.value = Math.round((p.loaded * 100) / (p.total || 100))
+      },
+    })
+    ElMessage.success(`成功解析并入库 ${selectedFiles.value.length} 个文档`)
+    selectedFiles.value = []
+    uiFileList.value = []
+  } catch (e) {
+    ElMessage.error('入库失败，请检查文件格式')
+  } finally {
+    setTimeout(() => {
+      isUploading.value = false
+    }, 800)
+  }
+}
+
+// --- 对话处理 ---
 const sendQuery = async () => {
   if (!queryInput.value.trim() || isLoading.value) return
 
@@ -191,15 +238,22 @@ const sendQuery = async () => {
   messages.value.push({ role: 'user', content: userText })
   queryInput.value = ''
   isLoading.value = true
-  isWaiting.value = true // 进入等待状态，显示思考动画
+  isWaiting.value = true
 
   startThinkingTimer()
   const lastIdx = messages.value.push({ role: 'assistant', content: '' }) - 1
 
   try {
-    const response = await fetch(`/api/chat?query=${encodeURIComponent(userText)}&chatId=user_1`, {
-      signal: abortController.signal,
-    })
+    // 建议从 localStorage 获取或生成持久的 chatId
+    const chatId = window.localStorage.getItem('rag_chat_id') || crypto.randomUUID()
+    window.localStorage.setItem('rag_chat_id', chatId)
+
+    const response = await fetch(
+      `/api/chat?query=${encodeURIComponent(userText)}&chatId=${chatId}`,
+      {
+        signal: abortController.signal,
+      },
+    )
 
     if (!response.body) return
     const reader = response.body.getReader()
@@ -212,7 +266,7 @@ const sendQuery = async () => {
       if (isWaiting.value) {
         stopThinkingTimer()
         messages.value[lastIdx].duration = currentThinkingTime.value
-        isWaiting.value = false // 收到数据，隐藏思考动画，显示内容气泡
+        isWaiting.value = false
       }
 
       const chunk = decoder.decode(value)
@@ -236,9 +290,13 @@ const sendQuery = async () => {
 // --- 工具函数 ---
 const startThinkingTimer = () => {
   currentThinkingTime.value = 0
-  thinkingTimer = window.setInterval(() => { currentThinkingTime.value += 0.1 }, 100)
+  thinkingTimer = window.setInterval(() => {
+    currentThinkingTime.value += 0.1
+  }, 100)
 }
-const stopThinkingTimer = () => { if (thinkingTimer) clearInterval(thinkingTimer) }
+const stopThinkingTimer = () => {
+  if (thinkingTimer) clearInterval(thinkingTimer)
+}
 const stopGeneration = () => {
   abortController.abort()
   abortController = new AbortController()
@@ -263,7 +321,7 @@ onUnmounted(() => stopThinkingTimer())
   overflow: hidden;
 }
 
-/* Header */
+/* Header 布局优化 */
 .chat-header {
   flex-shrink: 0;
   background: #fff;
@@ -273,18 +331,61 @@ onUnmounted(() => stopThinkingTimer())
   justify-content: space-between;
   align-items: center;
   border-bottom: 1px solid #e2e8f0;
-  z-index: 10;
+  z-index: 100;
 }
-.header-info { display: flex; align-items: center; gap: 10px; }
-.title-text { font-size: 18px; font-weight: 600; color: #1e293b; }
-.upload-actions { display: flex; align-items: center; gap: 12px; }
+.header-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+.title-text {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1e293b;
+  white-space: nowrap;
+}
+.upload-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
 
-/* 消息区域 */
+/* 批量上传文件列表悬浮显示，不占用 Header 高度 */
+.upload-component :deep(.el-upload-list) {
+  position: absolute;
+  top: 55px;
+  right: 130px;
+  width: 260px;
+  background: white;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  max-height: 200px;
+  overflow-y: auto;
+  z-index: 1000;
+  padding: 8px;
+}
+
+/* 进度条 */
+.progress-bar-wrapper {
+  background: #fff;
+  padding: 8px 24px;
+  border-bottom: 1px solid #f1f5f9;
+}
+.progress-text {
+  font-size: 11px;
+  color: #64748b;
+  margin-top: 4px;
+  display: block;
+}
+
+/* 消息容器 */
 .message-container {
   flex: 1;
+  height: 0;
   overflow-y: auto;
   padding: 24px 0;
-  scroll-behavior: smooth;
 }
 .message-list-inner {
   max-width: 900px;
@@ -294,54 +395,81 @@ onUnmounted(() => stopThinkingTimer())
 
 .msg-wrapper {
   display: flex;
-  margin-bottom: 24px;
+  margin-bottom: 28px;
   gap: 14px;
   align-items: flex-start;
 }
-.msg-wrapper.user { justify-content: flex-end; }
-.msg-body { max-width: 80%; }
+.msg-wrapper.user {
+  justify-content: flex-end;
+}
+.msg-body {
+  max-width: 82%;
+}
 
 .msg-meta {
   margin-bottom: 6px;
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
-  color: #64748b;
+  font-size: 12px;
+  color: #94a3b8;
 }
 
 /* 气泡美化 */
 .msg-bubble {
-  padding: 12px 18px;
+  padding: 14px 18px;
   font-size: 15px;
-  line-height: 1.6;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+  line-height: 1.7;
 }
 .user .msg-bubble {
   background: #3b82f6;
   color: #fff;
   border-radius: 18px 4px 18px 18px;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);
 }
 .assistant .msg-bubble {
   background: #fff;
   border: 1px solid #e2e8f0;
-  color: #1e293b;
+  color: #334155;
   border-radius: 4px 18px 18px 18px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
 }
 
-/* Markdown 排版细化 */
+/* Markdown 深度美化 */
 :deep(.markdown-body) {
   font-size: 15px;
   background: transparent !important;
+  color: inherit;
 }
 :deep(.markdown-body pre) {
   background-color: #1e1e1e !important;
-  border-radius: 8px;
-  padding: 14px;
-  margin: 10px 0;
+  border-radius: 10px;
+  padding: 16px;
+  margin: 14px 0;
+  border: 1px solid #334155;
+}
+:deep(.markdown-body h1),
+:deep(.markdown-body h2),
+:deep(.markdown-body h3) {
+  margin: 1.4em 0 0.8em;
+  color: #0f172a;
+}
+:deep(.markdown-body p) {
+  margin-bottom: 0.8em;
+}
+:deep(.markdown-body code) {
+  font-family: 'Fira Code', 'Consolas', monospace;
+  background-color: #f1f5f9;
+  color: #ef4444;
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+:deep(.markdown-body pre code) {
+  background: transparent;
+  color: #e2e8f0;
 }
 
-/* 思考中动画容器 */
+/* 思考动画 */
 .thinking-status {
   display: flex;
   align-items: center;
@@ -357,13 +485,23 @@ onUnmounted(() => stopThinkingTimer())
   height: 8px;
   border-radius: 50%;
   background-color: #3b82f6;
-  animation: typing 1s infinite alternate;
+  animation: typing 0.8s infinite alternate;
 }
-@keyframes typing { from { transform: scale(1); opacity: 1; } to { transform: scale(1.5); opacity: 0.3; } }
+@keyframes typing {
+  from {
+    transform: scale(1);
+    opacity: 1;
+  }
+  to {
+    transform: scale(1.6);
+    opacity: 0.3;
+  }
+}
 
 /* 底部输入框 */
 .footer-input {
-  padding: 16px 24px 24px;
+  flex-shrink: 0;
+  padding: 16px 24px 30px;
   background: #fff;
   border-top: 1px solid #e2e8f0;
 }
@@ -371,16 +509,20 @@ onUnmounted(() => stopThinkingTimer())
   max-width: 900px;
   margin: 0 auto;
   border: 1px solid #cbd5e1;
-  border-radius: 12px;
-  padding: 8px;
-  transition: border-color 0.2s;
+  border-radius: 14px;
+  padding: 10px;
+  transition: all 0.2s;
 }
-.input-card:focus-within { border-color: #3b82f6; }
+.input-card:focus-within {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
 
 :deep(.el-textarea__inner) {
   box-shadow: none !important;
   border: none !important;
   resize: none;
+  font-size: 15px;
 }
 
 .input-actions {
@@ -390,15 +532,24 @@ onUnmounted(() => stopThinkingTimer())
   margin-top: 8px;
   padding: 0 4px;
 }
-.tip { font-size: 12px; color: #94a3b8; }
+.tip {
+  font-size: 12px;
+  color: #94a3b8;
+}
 
 .welcome-wrapper {
-  height: 300px;
+  flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
+  min-height: 400px;
+}
+.welcome-box {
   text-align: center;
   color: #64748b;
 }
-.bot-icon { font-size: 50px; margin-bottom: 12px; }
+.bot-icon {
+  font-size: 60px;
+  margin-bottom: 16px;
+}
 </style>
