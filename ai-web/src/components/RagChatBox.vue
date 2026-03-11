@@ -11,7 +11,6 @@
       </div>
 
       <div class="upload-actions">
-        <!-- 文件列表气泡展示 -->
         <el-popover
           v-if="uiFileList.length > 0"
           placement="bottom-end"
@@ -34,7 +33,6 @@
                   <el-icon><Document /></el-icon>
                   <span class="file-name" :title="file.name">{{ file.name }}</span>
                 </div>
-                <!-- 修复点：修改点击事件，只传当前 file 对象 -->
                 <el-icon class="remove-icon" @click="handleFileRemove(file)"><CircleClose /></el-icon>
               </div>
             </div>
@@ -79,7 +77,7 @@
     <!-- 2. 中间：消息显示区 -->
     <div class="message-container" ref="chatContainer">
       <div class="message-list-inner">
-        <!-- 欢迎页 (保持不变) -->
+        <!-- 欢迎页 - 深度美化示例卡片 -->
         <div v-if="messages.length === 0 && !isLoading" class="welcome-wrapper">
           <div class="welcome-hero">
             <div class="hero-icon">👨‍💻</div>
@@ -112,7 +110,7 @@
           </div>
         </div>
 
-        <!-- 消息列表 (保持不变) -->
+        <!-- 消息列表 -->
         <div v-for="(msg, index) in messages" :key="index" :class="['msg-wrapper', msg.role]">
           <el-avatar :size="36" :src="msg.role === 'assistant' ? botAvatar : userAvatar" />
           <div class="msg-body">
@@ -135,7 +133,7 @@
           </div>
         </div>
 
-        <!-- 思考中状态 (保持不变) -->
+        <!-- 思考中状态 -->
         <div v-if="isLoading && isWaiting" class="msg-wrapper assistant">
           <el-avatar :size="36" :src="botAvatar" />
           <div class="msg-body">
@@ -148,7 +146,7 @@
       </div>
     </div>
 
-    <!-- 3. 底部：输入区 (保持不变) -->
+    <!-- 3. 底部：输入区 -->
     <div class="footer-input">
       <div class="input-card-modern">
         <el-input
@@ -245,14 +243,11 @@ const handleFileChange = (file: UploadFile, fileList: UploadFile[]) => {
   uiFileList.value = fileList as UploadUserFile[]
 }
 
-// --- 修复重点：兼容手动删除和 el-upload 自动删除 ---
 const handleFileRemove = (file: UploadFile, fileList?: UploadFile[]) => {
   if (fileList) {
-    // 1. 如果是从 el-upload 组件内部触发的 (带 fileList 参数)
     selectedFiles.value = fileList.map((f) => f.raw as File)
     uiFileList.value = fileList as UploadUserFile[]
   } else {
-    // 2. 如果是从我们的 Popover 清单手动点击触发的 (不带 fileList 参数)
     const index = uiFileList.value.indexOf(file as UploadUserFile)
     if (index !== -1) {
       uiFileList.value.splice(index, 1)
@@ -309,7 +304,7 @@ onUnmounted(() => stopThinkingTimer())
 </script>
 
 <style scoped>
-/* 样式部分保持您的原有美化逻辑不变 */
+/* 核心布局 */
 .page-container { display: flex; flex-direction: column; height: calc(100vh - 60px); background: #f8fafc; overflow: hidden; }
 .chat-header { flex-shrink: 0; height: 56px; background: #fff; padding: 0 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0; }
 .header-left { display: flex; align-items: center; gap: 12px; }
@@ -325,8 +320,12 @@ onUnmounted(() => stopThinkingTimer())
 .remove-icon { color: #94a3b8; cursor: pointer; transition: 0.2s; }
 .remove-icon:hover { color: #f87171; }
 .upload-actions { display: flex; align-items: center; gap: 12px; }
+
+/* 消息区 */
 .message-container { flex: 1; overflow-y: auto; padding: 20px 0; }
 .message-list-inner { max-width: 880px; margin: 0 auto; padding: 0 20px; }
+
+/* 欢迎页与示例问题卡片美化 */
 .welcome-hero { text-align: center; margin-bottom: 24px; }
 .hero-icon { font-size: 40px; margin-bottom: 8px; }
 .welcome-title { font-size: 22px; font-weight: 800; color: #1e293b; margin: 0 0 8px 0; }
@@ -346,11 +345,15 @@ onUnmounted(() => stopThinkingTimer())
 .assistant-bubble { background: #fff; border: 1px solid #e2e8f0; border-radius: 4px 16px 16px 16px; }
 .msg-meta { font-size: 11px; color: #94a3b8; margin-bottom: 4px; display: flex; align-items: center; gap: 8px; }
 .time-tag { color: #3b82f6; background: #eff6ff; padding: 1px 6px; border-radius: 4px; display: flex; align-items: center; gap: 4px; font-weight: 600; }
+
+/* 底部输入框 */
 .footer-input { flex-shrink: 0; padding: 12px 20px 20px; background: #f8fafc; }
 .input-card-modern { max-width: 880px; margin: 0 auto; background: #fff; border: 1px solid #cbd5e1; border-radius: 16px; padding: 8px 12px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04); }
 :deep(.el-textarea__inner) { box-shadow: none !important; border: none !important; font-size: 14px; padding: 4px 0 !important; }
 .input-toolbar { display: flex; justify-content: space-between; align-items: center; margin-top: 4px; border-top: 1px solid #f1f5f9; padding-top: 8px; }
 .feature-tag { font-size: 10px; color: #94a3b8; display: flex; align-items: center; gap: 4px; }
+
+/* 思考态动画 */
 .thinking-bubble { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #94a3b8; }
 .dot-typing { width: 4px; height: 4px; background: #3b82f6; border-radius: 50%; animation: typing 1s infinite; }
 @keyframes typing { 0%, 100% { transform: scale(1); opacity: 0.5; } 50% { transform: scale(1.5); opacity: 1; } }
