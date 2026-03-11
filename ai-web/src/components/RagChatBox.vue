@@ -6,7 +6,6 @@
         <div class="logo-box">🚀</div>
         <div class="title-wrapper">
           <h2 class="title-text">技术站 · 智库问答</h2>
-          <span class="status-tag">RAG Engine V2.0</span>
         </div>
       </div>
 
