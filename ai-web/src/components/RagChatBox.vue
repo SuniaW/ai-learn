@@ -225,10 +225,10 @@ let abortController = new AbortController()
 
 // --- 示例问题数据 ---
 const exampleQuestions = [
-  { icon: '📝', query: '总结已上传文档的核心架构', color: '#3b82f6' },
-  { icon: '🛡️', query: '分析该系统的安全性设计', color: '#10b981' },
-  { icon: '🚀', query: '如何快速部署到生产环境？', color: '#f59e0b' },
-  { icon: '🔍', query: '列出所有关键 API 接口定义', color: '#8b5cf6' },
+  { icon: '📝', query: 'docker简介', color: '#3b82f6' },
+  { icon: '🛡️', query: 'milvus简介', color: '#10b981' },
+  { icon: '🚀', query: 'ollama简介', color: '#f59e0b' },
+  { icon: '🔍', query: '如何在Linux上部署docker', color: '#8b5cf6' }
 ]
 
 // --- 文件处理 ---
