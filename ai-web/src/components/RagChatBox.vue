@@ -28,22 +28,41 @@
           >
             <template #reference>
               <el-button link class="file-count-trigger">
-                <el-icon><Files /></el-icon>
-                <span>待处理文档 ({{ uiFileList.length }})</span>
+                <div class="count-badge-wrapper">
+                  <el-icon><Files /></el-icon>
+                  <span>待处理文档</span>
+                  <span class="count-tag">{{ uiFileList.length }}</span>
+                </div>
               </el-button>
             </template>
 
             <div class="popover-file-container">
-              <div class="popover-header">已选择的文档</div>
-              <div class="popover-list">
+              <div class="popover-header">
+                <span class="title">已选文件清单</span>
+                <span class="sub-title">准备上传至知识库</span>
+              </div>
+
+              <div class="popover-list-wrapper">
                 <div v-for="file in uiFileList" :key="file.uid" class="popover-item">
                   <div class="file-info">
-                    <el-icon class="file-icon"><Document /></el-icon>
-                    <span class="file-name" :title="file.name">{{ file.name }}</span>
+                    <div class="file-icon-box">
+                      <el-icon><Document /></el-icon>
+                    </div>
+                    <div class="file-details">
+                      <span class="file-name" :title="file.name">{{ file.name }}</span>
+                      <span class="file-size">{{ (file.size / 1024).toFixed(1) }} KB</span>
+                    </div>
                   </div>
-                  <el-icon class="remove-icon" @click="handleFileRemove(file)"
-                    ><CircleClose
-                  /></el-icon>
+                  <div class="item-actions">
+                    <el-button
+                      link
+                      type="danger"
+                      class="remove-btn"
+                      @click="handleFileRemove(file)"
+                    >
+                      <el-icon><CircleClose /></el-icon>
+                    </el-button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -855,5 +874,158 @@ onUnmounted(() => stopThinkingTimer())
   background-color: #1e293b;
   border-radius: 8px;
   margin: 12px 0;
+}
+
+/* --- 触发按钮美化 --- */
+.file-count-trigger {
+  border-radius: 8px !important;
+  transition: all 0.2s !important;
+}
+
+.file-count-trigger:hover {
+  background: #f3f4f6 !important;
+}
+
+.count-badge-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #4b5563;
+}
+
+.count-tag {
+  background: #3b82f6;
+  color: white;
+  font-size: 11px;
+  padding: 0 6px;
+  border-radius: 10px;
+  min-width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+}
+
+/* --- Popover 内容区 --- */
+.popover-file-container {
+  padding: 4px;
+}
+
+.popover-header {
+  padding: 8px 12px 12px;
+  border-bottom: 1px solid #f3f4f6;
+  margin-bottom: 8px;
+}
+
+.popover-header .title {
+  display: block;
+  font-size: 14px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.popover-header .sub-title {
+  font-size: 11px;
+  color: #9ca3af;
+}
+
+/* 列表滚动条优化 */
+.popover-list-wrapper {
+  max-height: 280px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.popover-list-wrapper::-webkit-scrollbar {
+  width: 4px;
+}
+
+.popover-list-wrapper::-webkit-scrollbar-thumb {
+  background: #e5e7eb;
+  border-radius: 4px;
+}
+
+/* 单个文件条目 */
+.popover-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px;
+  border-radius: 10px;
+  transition: all 0.2s;
+  margin-bottom: 2px;
+  group: hover; /* 逻辑上配合 hover */
+}
+
+.popover-item:hover {
+  background-color: #f8fafc;
+}
+
+.file-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+}
+
+.file-icon-box {
+  width: 32px;
+  height: 32px;
+  background: #eff6ff;
+  color: #3b82f6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+.file-details {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.file-name {
+  font-size: 13px;
+  color: #374151;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.file-size {
+  font-size: 11px;
+  color: #9ca3af;
+}
+
+/* 删除按钮交互 */
+.remove-btn {
+  opacity: 0; /* 默认隐藏 */
+  padding: 4px !important;
+  transition: all 0.2s !important;
+}
+
+.popover-item:hover .remove-btn {
+  opacity: 1; /* 鼠标移入条目时显示 */
+}
+
+.remove-btn:hover {
+  background: #fee2e2 !important;
+  color: #ef4444 !important;
+  border-radius: 50%;
+}
+
+/* 全局覆盖 Element Plus Popover 样式 (可选) */
+:global(.el-popover.custom-file-popover) {
+  padding: 12px !important;
+  border-radius: 16px !important;
+  box-shadow:
+    0 10px 25px -5px rgba(0, 0, 0, 0.1),
+    0 8px 10px -6px rgba(0, 0, 0, 0.1) !important;
+  border: 1px solid #e5e7eb !important;
 }
 </style>
