@@ -34,9 +34,8 @@
                   <el-icon><Document /></el-icon>
                   <span class="file-name" :title="file.name">{{ file.name }}</span>
                 </div>
-                <el-icon class="remove-icon" @click="handleFileRemove(file, uiFileList)"
-                ><CircleClose
-                /></el-icon>
+                <!-- 修复点：修改点击事件，只传当前 file 对象 -->
+                <el-icon class="remove-icon" @click="handleFileRemove(file)"><CircleClose /></el-icon>
               </div>
             </div>
           </div>
@@ -80,7 +79,7 @@
     <!-- 2. 中间：消息显示区 -->
     <div class="message-container" ref="chatContainer">
       <div class="message-list-inner">
-        <!-- 欢迎页 -->
+        <!-- 欢迎页 (保持不变) -->
         <div v-if="messages.length === 0 && !isLoading" class="welcome-wrapper">
           <div class="welcome-hero">
             <div class="hero-icon">👨‍💻</div>
@@ -113,11 +112,10 @@
           </div>
         </div>
 
-        <!-- 消息列表 -->
+        <!-- 消息列表 (保持不变) -->
         <div v-for="(msg, index) in messages" :key="index" :class="['msg-wrapper', msg.role]">
           <el-avatar :size="36" :src="msg.role === 'assistant' ? botAvatar : userAvatar" />
           <div class="msg-body">
-            <!-- 修复点：确保元数据行包含响应时长展示 -->
             <div class="msg-meta" v-if="msg.role === 'assistant'">
               <span class="name-tag">智库助手</span>
               <span v-if="msg.duration" class="time-tag">
@@ -137,13 +135,12 @@
           </div>
         </div>
 
-        <!-- 思考中状态 -->
+        <!-- 思考中状态 (保持不变) -->
         <div v-if="isLoading && isWaiting" class="msg-wrapper assistant">
           <el-avatar :size="36" :src="botAvatar" />
           <div class="msg-body">
             <div class="thinking-bubble">
               <div class="dot-typing"></div>
-              <!-- 修复点：添加实时思考时间展示 -->
               <span>AI 正在思考... ({{ currentThinkingTime.toFixed(1) }}s)</span>
             </div>
           </div>
@@ -151,7 +148,7 @@
       </div>
     </div>
 
-    <!-- 3. 底部：输入区 -->
+    <!-- 3. 底部：输入区 (保持不变) -->
     <div class="footer-input">
       <div class="input-card-modern">
         <el-input
@@ -204,36 +201,25 @@ import type { UploadFile, UploadUserFile } from 'element-plus'
 
 // --- Markdown 配置 ---
 const md = new MarkdownIt({
-  html: true,
-  linkify: true,
-  breaks: true,
+  html: true, linkify: true, breaks: true,
   highlight: (str, lang) => {
     if (lang && hljs.getLanguage(lang)) {
-      try {
-        return `<pre class="hljs"><code>${hljs.highlight(str, { language: lang, ignoreIllegals: true }).value}</code></pre>`
-      } catch (__) {}
+      try { return `<pre class="hljs"><code>${hljs.highlight(str, { language: lang, ignoreIllegals: true }).value}</code></pre>` } catch (__) {}
     }
     return `<pre class="hljs"><code>${md.utils.escapeHtml(str)}</code></pre>`
   },
 })
-
 const preprocessMarkdown = (text: string) => {
   if (!text) return ''
   return text.replace(/([^\n])(#+\s)/g, '$1\n\n$2').replace(/([^\n])(\d\.\s)/g, '$1\n$2')
 }
-
 const renderMarkdown = (content: string) => (content ? md.render(preprocessMarkdown(content)) : '')
 
 // --- 状态管理 ---
 const userAvatar = 'https://api.dicebear.com/7.x/avataaars/svg?seed=Felix'
 const botAvatar = 'https://api.dicebear.com/7.x/bottts/svg?seed=Aneka'
 
-interface Message {
-  role: 'user' | 'assistant'
-  content: string
-  duration?: number
-}
-
+interface Message { role: 'user' | 'assistant'; content: string; duration?: number }
 const messages = ref<Message[]>([])
 const queryInput = ref('')
 const selectedFiles = ref<File[]>([])
@@ -259,9 +245,20 @@ const handleFileChange = (file: UploadFile, fileList: UploadFile[]) => {
   uiFileList.value = fileList as UploadUserFile[]
 }
 
-const handleFileRemove = (file: UploadFile, fileList: UploadFile[]) => {
-  selectedFiles.value = fileList.map((f) => f.raw as File)
-  uiFileList.value = fileList as UploadUserFile[]
+// --- 修复重点：兼容手动删除和 el-upload 自动删除 ---
+const handleFileRemove = (file: UploadFile, fileList?: UploadFile[]) => {
+  if (fileList) {
+    // 1. 如果是从 el-upload 组件内部触发的 (带 fileList 参数)
+    selectedFiles.value = fileList.map((f) => f.raw as File)
+    uiFileList.value = fileList as UploadUserFile[]
+  } else {
+    // 2. 如果是从我们的 Popover 清单手动点击触发的 (不带 fileList 参数)
+    const index = uiFileList.value.indexOf(file as UploadUserFile)
+    if (index !== -1) {
+      uiFileList.value.splice(index, 1)
+      selectedFiles.value.splice(index, 1)
+    }
+  }
 }
 
 const uploadFiles = async () => {
@@ -270,20 +267,13 @@ const uploadFiles = async () => {
   uploadPercent.value = 0
   const formData = new FormData()
   selectedFiles.value.forEach((file) => { formData.append('files', file) })
-
   try {
     await axios.post('/api/upload', formData, {
-      onUploadProgress: (p) => {
-        uploadPercent.value = Math.round((p.loaded * 100) / (p.total || 100))
-      },
+      onUploadProgress: (p) => { uploadPercent.value = Math.round((p.loaded * 100) / (p.total || 100)) },
     })
     ElMessage.success('上传成功')
     selectedFiles.value = []; uiFileList.value = []
-  } catch (e) {
-    ElMessage.error('上传失败')
-  } finally {
-    setTimeout(() => { isUploading.value = false }, 800)
-  }
+  } catch (e) { ElMessage.error('上传失败') } finally { setTimeout(() => { isUploading.value = false }, 800) }
 }
 
 const sendQuery = async () => {
@@ -291,94 +281,40 @@ const sendQuery = async () => {
   const userText = queryInput.value
   messages.value.push({ role: 'user', content: userText })
   queryInput.value = ''
-  isLoading.value = true
-  isWaiting.value = true
-
+  isLoading.value = true; isWaiting.value = true
   startThinkingTimer()
   const lastIdx = messages.value.push({ role: 'assistant', content: '' }) - 1
-
   try {
     const chatId = window.localStorage.getItem('rag_chat_id') || crypto.randomUUID()
     window.localStorage.setItem('rag_chat_id', chatId)
     const response = await fetch(`/api/chat?query=${encodeURIComponent(userText)}&chatId=${chatId}`, { signal: abortController.signal })
-
     if (!response.body) return
-    const reader = response.body.getReader()
-    const decoder = new TextDecoder()
-
+    const reader = response.body.getReader(); const decoder = new TextDecoder()
     while (true) {
-      const { done, value } = await reader.read()
-      if (done) break
-
-      if (isWaiting.value) {
-        stopThinkingTimer()
-        messages.value[lastIdx].duration = currentThinkingTime.value
-        isWaiting.value = false
-      }
-
+      const { done, value } = await reader.read(); if (done) break
+      if (isWaiting.value) { stopThinkingTimer(); messages.value[lastIdx].duration = currentThinkingTime.value; isWaiting.value = false }
       const chunk = decoder.decode(value)
       const lines = chunk.split('\n')
-      for (const line of lines) {
-        if (line.trim().startsWith('data:')) {
-          messages.value[lastIdx].content += line.trim().substring(5)
-          scrollToBottom()
-        }
-      }
+      for (const line of lines) { if (line.trim().startsWith('data:')) { messages.value[lastIdx].content += line.trim().substring(5); scrollToBottom() } }
     }
-  } catch (e) {
-    console.error(e)
-  } finally {
-    isLoading.value = false
-    isWaiting.value = false
-    stopThinkingTimer()
-  }
+  } catch (e) { console.error(e) } finally { isLoading.value = false; isWaiting.value = false; stopThinkingTimer() }
 }
 
 const handleExampleClick = (query: string) => { queryInput.value = query; sendQuery() }
-const startThinkingTimer = () => {
-  currentThinkingTime.value = 0
-  thinkingTimer = window.setInterval(() => { currentThinkingTime.value += 0.1 }, 100)
-}
+const startThinkingTimer = () => { currentThinkingTime.value = 0; thinkingTimer = window.setInterval(() => { currentThinkingTime.value += 0.1 }, 100) }
 const stopThinkingTimer = () => { if (thinkingTimer) clearInterval(thinkingTimer) }
-const stopGeneration = () => {
-  abortController.abort()
-  abortController = new AbortController()
-  isLoading.value = false
-  isWaiting.value = false
-  stopThinkingTimer()
-}
-const scrollToBottom = () => {
-  nextTick(() => { if (chatContainer.value) chatContainer.value.scrollTop = chatContainer.value.scrollHeight })
-}
+const stopGeneration = () => { abortController.abort(); abortController = new AbortController(); isLoading.value = false; isWaiting.value = false; stopThinkingTimer() }
+const scrollToBottom = () => { nextTick(() => { if (chatContainer.value) chatContainer.value.scrollTop = chatContainer.value.scrollHeight }) }
 onUnmounted(() => stopThinkingTimer())
 </script>
 
 <style scoped>
-/* 核心布局修复 */
-.page-container {
-  display: flex;
-  flex-direction: column;
-  height: calc(100vh - 60px);
-  background: #f8fafc;
-  overflow: hidden;
-}
-
-/* Header */
-.chat-header {
-  flex-shrink: 0;
-  height: 56px;
-  background: #fff;
-  padding: 0 20px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  border-bottom: 1px solid #e2e8f0;
-}
+/* 样式部分保持您的原有美化逻辑不变 */
+.page-container { display: flex; flex-direction: column; height: calc(100vh - 60px); background: #f8fafc; overflow: hidden; }
+.chat-header { flex-shrink: 0; height: 56px; background: #fff; padding: 0 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0; }
 .header-left { display: flex; align-items: center; gap: 12px; }
 .title-text { font-size: 16px; font-weight: 700; color: #0f172a; margin: 0; }
 .status-tag { font-size: 10px; color: #3b82f6; background: #eff6ff; padding: 1px 6px; border-radius: 4px; }
-
-/* 文件列表按钮 */
 .file-count-btn { font-weight: 600; font-size: 13px; display: flex; align-items: center; gap: 4px; }
 .popover-file-container { padding: 4px; }
 .popover-header { font-size: 12px; color: #94a3b8; font-weight: 700; margin-bottom: 8px; border-bottom: 1px solid #f1f5f9; padding-bottom: 4px; }
@@ -388,14 +324,9 @@ onUnmounted(() => stopThinkingTimer())
 .file-name { font-size: 13px; color: #475569; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px; }
 .remove-icon { color: #94a3b8; cursor: pointer; transition: 0.2s; }
 .remove-icon:hover { color: #f87171; }
-
 .upload-actions { display: flex; align-items: center; gap: 12px; }
-
-/* 消息区 */
 .message-container { flex: 1; overflow-y: auto; padding: 20px 0; }
 .message-list-inner { max-width: 880px; margin: 0 auto; padding: 0 20px; }
-
-/* 欢迎页 */
 .welcome-hero { text-align: center; margin-bottom: 24px; }
 .hero-icon { font-size: 40px; margin-bottom: 8px; }
 .welcome-title { font-size: 22px; font-weight: 800; color: #1e293b; margin: 0 0 8px 0; }
@@ -408,26 +339,18 @@ onUnmounted(() => stopThinkingTimer())
 .card-left-line { width: 4px; flex-shrink: 0; }
 .card-main { flex: 1; padding: 12px; overflow: hidden; }
 .card-query { font-size: 13px; font-weight: 600; color: #334155; }
-
-/* 气泡样式 */
 .msg-wrapper { display: flex; margin-bottom: 20px; gap: 12px; }
 .msg-wrapper.user { flex-direction: row-reverse; }
 .msg-bubble { padding: 12px 16px; font-size: 14px; line-height: 1.6; }
 .user-bubble { background: #3b82f6; color: #fff; border-radius: 16px 4px 16px 16px; }
 .assistant-bubble { background: #fff; border: 1px solid #e2e8f0; border-radius: 4px 16px 16px 16px; }
-
-/* 修复点：响应时长标签样式 */
 .msg-meta { font-size: 11px; color: #94a3b8; margin-bottom: 4px; display: flex; align-items: center; gap: 8px; }
 .time-tag { color: #3b82f6; background: #eff6ff; padding: 1px 6px; border-radius: 4px; display: flex; align-items: center; gap: 4px; font-weight: 600; }
-
-/* 底部输入框 */
 .footer-input { flex-shrink: 0; padding: 12px 20px 20px; background: #f8fafc; }
 .input-card-modern { max-width: 880px; margin: 0 auto; background: #fff; border: 1px solid #cbd5e1; border-radius: 16px; padding: 8px 12px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04); }
 :deep(.el-textarea__inner) { box-shadow: none !important; border: none !important; font-size: 14px; padding: 4px 0 !important; }
 .input-toolbar { display: flex; justify-content: space-between; align-items: center; margin-top: 4px; border-top: 1px solid #f1f5f9; padding-top: 8px; }
 .feature-tag { font-size: 10px; color: #94a3b8; display: flex; align-items: center; gap: 4px; }
-
-/* 思考态打点动画 */
 .thinking-bubble { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #94a3b8; }
 .dot-typing { width: 4px; height: 4px; background: #3b82f6; border-radius: 50%; animation: typing 1s infinite; }
 @keyframes typing { 0%, 100% { transform: scale(1); opacity: 0.5; } 50% { transform: scale(1.5); opacity: 1; } }
