@@ -1,28 +1,30 @@
-# --- 阶段一：编译阶段 ---
-FROM node:18-alpine as build-stage
+# --- 第一阶段：构建阶段 ---
+FROM node:20-alpine AS build-stage
 
 # 设置工作目录
 WORKDIR /app
 
-# 复制依赖文件并安装
+# 利用 Docker 缓存层：先拷贝 package.json
 COPY package*.json ./
-RUN npm install
 
-# 复制所有源码并构建
+# 安装依赖（如果是国内服务器，可以设置镜像源）
+RUN npm config set registry https://registry.npmmirror.com && \
+    npm install
+
+# 拷贝所有源码并执行打包
 COPY . .
 RUN npm run build
 
-# --- 阶段二：运行阶段 ---
-FROM nginx:stable-alpine as production-stage
+# --- 第二阶段：运行阶段 ---
+FROM nginx:stable-alpine AS production-stage
 
-# 从第一阶段的成果物中复制 dist 文件夹到 Nginx 目录
+# 从构建阶段拷贝打包后的文件到 Nginx 目录
 COPY --from=build-stage /app/dist /usr/share/nginx/html
 
-# 复制自定义的 Nginx 配置覆盖默认配置
+# 拷贝自定义的 Nginx 配置
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 # 暴露 80 端口
 EXPOSE 80
 
-# 启动 Nginx
 CMD ["nginx", "-g", "daemon off;"]
