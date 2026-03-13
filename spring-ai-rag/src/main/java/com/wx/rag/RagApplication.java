@@ -16,7 +16,4 @@ public class RagApplication {
         SpringApplication.run(RagApplication.class, args);
     }
 
-
-
-
 }
