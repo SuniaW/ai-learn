@@ -12,9 +12,9 @@
     </parent>
 
     <groupId>com.wx.policyragsystem</groupId>
-    <artifactId>spring-ai-rag-system</artifactId>
+    <artifactId>spring-ai-rag</artifactId>
     <version>1.0-SNAPSHOT</version>
-    <name>policy-rag-system</name>
+    <name>spring-ai-rag</name>
     <description>Based on Spring Boot 3.4 + Spring AI + Milvus</description>
 
     <properties>

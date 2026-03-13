@@ -9,9 +9,9 @@
 		<relativePath/> <!-- lookup parent from repository -->
 	</parent>
 	<groupId>com.wx.ai.learn</groupId>
-	<artifactId>spring-ai-deepseek</artifactId>
+	<artifactId>spring-ai-chat</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
-	<name>spring-ai-learn</name>
+	<name>spring-ai-chart</name>
 	<description>Demo project for Spring Boot</description>
 	<url/>
 	<licenses>
