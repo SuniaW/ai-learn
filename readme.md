@@ -2399,6 +2399,9 @@ docker image prune -a -f
 # 4. 清理构建缓存
 docker builder prune -f
 
+# 删除所有停止的容器、未使用的网络和挂起的镜像
+docker system prune -a -f
+
 # 5. 清理未使用的卷（确保没有重要数据在其中）
 docker volume prune -f
 ```
@@ -2413,10 +2416,15 @@ sync
 
 # 2. 清理 PageCache、dentries 和 inodes
 # 1=PageCache, 2=Slab, 3=Both
-echo 3 > /proc/sys/vm/drop_caches
+# 释放网页缓存、目录项和索引
+sync; echo 3 > /proc/sys/vm/drop_caches
 
-# 3. 清理 systemd 日志（限制为 50MB）
-journalctl --vacuum-size=50M
+# 检查当前日志占用大小
+journalctl --disk-usage
+
+# 将日志限制在 100MB 以内，并清理超过 1 天的日志
+sudo journalctl --vacuum-time=1d
+sudo journalctl --vacuum-size=100M
 
 # 4. 清理 apt 缓存
 apt-get clean && apt-get autoremove -y
@@ -2424,7 +2432,7 @@ apt-get clean && apt-get autoremove -y
 
 #### 28.4.3 揪出"隐形"内存杀手
 
-如果执行完上述操作，内存依然紧张，需要使用 `smem` 或 `ps` 命令查看更详细的内存占用（包括共享内存）。
+1. 如果执行完上述操作，内存依然紧张，需要使用 `smem` 或 `ps` 命令查看更详细的内存占用（包括共享内存）。
 
 ```bash
 # 安装 smem 工具（如果没有）
@@ -2436,6 +2444,13 @@ smem -r -k
 # 或者使用 ps 查看详细的 RSS 和 VSZ
 ps aux --sort=-%mem | head -n 10
 ```
+
+2. 执行这个命令，找出隐藏的内存大户（不仅仅看进程，看总和）：
+```bash
+# 查看 Docker 容器真实的内存开销
+docker stats --no-stream
+```
+如果 `docker stats` 显示的总和很大，而 `top` 没显示，说明内存被 **Docker 的虚拟化层** 锁定了。
 
 > 📌 **注：** 有时候 Java 进程的 Native Memory Tracking (NMT) 或者 C++ 应用的堆外内存不会完全体现在 `top` 的 `%MEM` 中，但会占用 RSS。
 
@@ -2454,7 +2469,46 @@ sysctl -p
 
 > ⚠️ **注意：** swappiness 过高会导致频繁的磁盘 I/O，使系统变慢，但在内存不足时能保命。
 
-#### 28.4.5 验证优化效果
+
+#### 28.4.5 强制 Ollama 释放模型内存
+Ollama 加载模型后，默认会一直驻留在内存中（即使你不再问答）。在 4G 内存机器上，这非常致命。
+```bash
+# 检查当前加载了哪些模型
+# 如果有模型在列表里，说明它占着内存
+ollama ps
+
+# 强制重启 Ollama 服务来清空所有加载的模型
+sudo systemctl restart ollama
+```
+*建议：在你的 `VectorStoreConfig` 启动成功后，再去调用 Ollama，避免多个组件同时抢占那仅剩的 500MB。*
+
+---
+
+#### 28.4.6 检查并关闭不常用的 Linux 服务
+如果你使用的是 Ubuntu/Debian，一些后台服务完全可以关掉：
+```bash
+# 1. 禁用多路径传输服务（除非你有多个硬盘路径）
+sudo systemctl stop multipathd && sudo systemctl disable multipathd
+
+# 2. 禁用自动更新服务（防止它在后台突然启动导致卡死）
+sudo systemctl stop apt-daily.timer && sudo systemctl disable apt-daily.timer
+sudo systemctl stop apt-daily-upgrade.timer && sudo systemctl disable apt-daily-upgrade.timer
+```
+
+#### 28.4.7 针对 Spring Boot 的最终警告
+你的截图里没看到 `java` 进程。一旦你启动 Spring Boot，它会瞬间吞掉 500MB-1GB。
+*   **请务必确认你的启动参数中限制了元空间（Metaspace）**，这部分内存是不计入堆内存（Xmx）的，但会占用物理内存：
+```bash
+java -Xms512m -Xmx1024m -XX:MaxMetaspaceSize=256m -jar app.jar
+```
+---
+
+#### 28.4.8 验证优化效果
+**总结建议：**
+1. **立即执行** `sync; echo 3 > /proc/sys/vm/drop_caches`。
+2. **立即执行** `docker system prune -f`。
+3. **观察** `top` 中的 `avail Mem` 是否回升到 **1000MB (1GB)** 以上。
+4. 如果 `avail Mem` 依然很低，说明 **Ollama 已经把模型加载到内存了**，请执行 `sudo systemctl restart ollama`。
 
 执行完上述步骤后，再次运行 `free -h` 和 `top`。
 
@@ -2462,10 +2516,11 @@ sysctl -p
 |----------|------|----------|
 | avail Mem | 应提升至 800MB - 1GB 以上 | ✅ > 800MB |
 | top 中的 Milvus 和 Ollama | 进程应能稳定运行，不再频繁波动 | ✅ 稳定运行 |
+**只要 `avail Mem` 维持在 1GB 以上，你的服务器操作就会非常流畅。**
+---
+### 28.5 统启动顺序优化
 
-### 28.5 【0305 专项】系统启动顺序优化
-
-> 📋 **0305 更新重点：解决多组件启动时的资源竞争问题**
+> 📋 **更新重点：解决多组件启动时的资源竞争问题**
 
 #### 28.5.1 正确的启动顺序
 
@@ -2499,9 +2554,9 @@ free -h       # 确认系统可用内存 > 200MB
 | Java 连接 Milvus 失败 | 确认 `application.yml` 中 host 为 `127.0.0.1` 或容器名 | 🔴 高 |
 | 内存不足 OOM | 立即执行 `docker compose down`，清理 Docker 缓存后重启 | 🔴 高 |
 
-### 28.6 【0309 专项】内存泄漏深度排查
+### 28.6 内存泄漏深度排查
 
-> 📋 **0309 更新重点：解决运行一段时间后内存持续增长的问题**
+> 📋 ** 更新重点：解决运行一段时间后内存持续增长的问题**
 
 #### 28.6.1 内存泄漏常见原因
 
