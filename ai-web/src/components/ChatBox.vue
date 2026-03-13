@@ -79,7 +79,7 @@ const answer = ref('')
 const loading = ref(false)
 const isFocus = ref(false)
 const timer = ref(0)
-let timerId: any = null
+let timerId: number = 0
 
 const renderedAnswer = computed(() => {
   if (!answer.value) return ''

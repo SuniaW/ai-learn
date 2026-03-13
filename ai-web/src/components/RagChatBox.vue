@@ -50,7 +50,7 @@
                     </div>
                     <div class="file-details">
                       <span class="file-name" :title="file.name">{{ file.name }}</span>
-                      <span class="file-size">{{ (file.size / 1024).toFixed(1) }} KB</span>
+                      <span class="file-size">{{ ((file.size ?? 0) / 1024).toFixed(1) }} KB</span>
                     </div>
                   </div>
                   <div class="item-actions">
@@ -58,7 +58,7 @@
                       link
                       type="danger"
                       class="remove-btn"
-                      @click="handleFileRemove(file)"
+                      @click="handleFileRemove(file as any)"
                     >
                       <el-icon><CircleClose /></el-icon>
                     </el-button>
@@ -231,7 +231,7 @@
 
 <script setup lang="ts">
 import { ref, nextTick, onUnmounted } from 'vue'
-import { Link, Right, Timer, Position, Files, CircleClose, Document } from '@element-plus/icons-vue'
+import { Link, Timer, Files, CircleClose, Document } from '@element-plus/icons-vue'
 import axios from 'axios'
 import MarkdownIt from 'markdown-it'
 import hljs from 'highlight.js'
@@ -245,15 +245,26 @@ const md = new MarkdownIt({
   html: true,
   linkify: true,
   breaks: true,
-  highlight: (str, lang) => {
+ // 3. 为 highlight 函数添加参数和返回值类型注解
+  highlight: (str: string, lang: string): string => {
+    // 你的高亮逻辑 (例如使用 highlight.js 或 prismjs)
+    // 假设你引入了 hljs
+    // import hljs from 'highlight.js';
+    /* 示例逻辑开始 */
     if (lang && hljs.getLanguage(lang)) {
       try {
-        return `<pre class="hljs"><code>${hljs.highlight(str, { language: lang, ignoreIllegals: true }).value}</code></pre>`
+        return hljs.highlight(str, { language: lang }).value;
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
       } catch (__) {}
     }
-    return `<pre class="hljs"><code>${md.utils.escapeHtml(str)}</code></pre>`
-  },
-})
+    /* 示例逻辑结束 */
+
+    // 如果没有高亮库，直接返回转义后的字符串，或者返回原字符串
+    // 必须确保这里返回的是 string
+    return str;
+  }
+});
+
 const preprocessMarkdown = (text: string) => {
   if (!text) return ''
   return text.replace(/([^\n])(#+\s)/g, '$1\n\n$2').replace(/([^\n])(\d\.\s)/g, '$1\n$2')
@@ -325,7 +336,7 @@ const uploadFiles = async () => {
     selectedFiles.value = []
     uiFileList.value = []
   } catch (e) {
-    ElMessage.error('上传失败')
+    ElMessage.error(`上传失败:${e}`)
   } finally {
     setTimeout(() => {
       isUploading.value = false
@@ -357,14 +368,14 @@ const sendQuery = async () => {
       if (done) break
       if (isWaiting.value) {
         stopThinkingTimer()
-        messages.value[lastIdx].duration = currentThinkingTime.value
+        messages.value[lastIdx]!.duration = currentThinkingTime.value
         isWaiting.value = false
       }
       const chunk = decoder.decode(value)
       const lines = chunk.split('\n')
       for (const line of lines) {
         if (line.trim().startsWith('data:')) {
-          messages.value[lastIdx].content += line.trim().substring(5)
+          messages.value[lastIdx]!.content += line.trim().substring(5)
           scrollToBottom()
         }
       }

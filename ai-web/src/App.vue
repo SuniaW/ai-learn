@@ -28,7 +28,7 @@
       <el-header height="60px" class="global-header">
         <el-breadcrumb separator="/">
           <el-breadcrumb-item :to="{ path: '/' }">首页</el-breadcrumb-item>
-          <el-breadcrumb-item v-if="$route.path !== '/'">AI 问答</el-breadcrumb-item>
+          <el-breadcrumb-item v-if="route.path !== '/'">AI 问答</el-breadcrumb-item>
         </el-breadcrumb>
         <el-avatar
           size="small"
@@ -46,6 +46,10 @@
     </el-container>
   </el-container>
 </template>
+<script setup lang="ts">
+import { useRoute } from 'vue-router'
+const route = useRoute()
+</script>
 
 <style>
 /* 全局样式强制去除外层滚动 */
